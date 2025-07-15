@@ -89,6 +89,11 @@ def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '
         try:
             album = app.db.get_album_by_id(album_id)
             tracks = app.db.get_tracks_by_album(album_id)
+            
+            # Convert bytes fields to strings for JSON serialization
+            if album['art_path']:
+                album['art_path'] = os.fsdecode(album['art_path'])
+            
             return render_template('album_detail.html', album=album, tracks=tracks)
         except AssertionError:
             abort(404)
