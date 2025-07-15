@@ -29,7 +29,7 @@
                 {{ (track.duration // 60)|int }}:{{ '%02d'|format((track.duration % 60)|int) }}
             {% endif %}
         </span>
-        <button class="play-button" onclick="playTrack({{ track.id }}, '{{ track.title }}', '{{ track.artist or album.artist or 'Unknown Artist' }}')">▶</button>
+        <button class="play-button" onclick="playTrack({{ track.id }})">▶</button>
     </div>
     {% endfor %}
 </div>

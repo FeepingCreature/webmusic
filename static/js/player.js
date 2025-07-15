@@ -328,24 +328,40 @@ class WebMusicPlayer {
         }
     }
     
-    playTrack(trackId, title, artist, albumContext = null) {
+    playTrack(trackId) {
+        // Read album context from DOM
+        const trackListElement = document.querySelector('.track-list');
+        if (!trackListElement) {
+            console.error('No track list found');
+            return;
+        }
+        
+        const albumContext = JSON.parse(trackListElement.dataset.albumContext);
+        if (!albumContext) {
+            console.error('No album context found');
+            return;
+        }
+        
+        // Find the track in the album context
+        const track = albumContext.tracks.find(t => t.id === trackId);
+        if (!track) {
+            console.error('Track not found in album context');
+            return;
+        }
+        
         const basePath = window.BASE_PATH || '';
         this.currentTrackId = trackId;
         this.seekOffset = 0; // Reset seek offset for new track
         this.audio.src = `${basePath}/stream/${trackId}`;
         this.audio.play();
+        
+        const artist = track.artist || albumContext.album.artist || 'Unknown Artist';
+        const title = track.title;
         this.currentTrackElement.textContent = `${artist} - ${title}`;
         
         // Set track duration from metadata
-        if (albumContext) {
-            const track = albumContext.tracks.find(t => t.id === trackId);
-            this.currentTrackDuration = track ? track.duration : 0;
-            this.setAlbumContext(albumContext, trackId);
-        } else {
-            // For single tracks, we'll use the audio element duration as fallback
-            this.currentTrackDuration = 0;
-            this.clearAlbumMode();
-        }
+        this.currentTrackDuration = track.duration || 0;
+        this.setAlbumContext(albumContext, trackId);
         
         this.updateDuration();
     }
@@ -461,14 +477,14 @@ class WebMusicPlayer {
         if (!this.albumContext || this.currentTrackIndex <= 0) return;
         
         const prevTrack = this.albumContext.tracks[this.currentTrackIndex - 1];
-        this.playTrack(prevTrack.id, prevTrack.title, prevTrack.artist || this.albumContext.album.artist, this.albumContext);
+        this.playTrack(prevTrack.id);
     }
     
     playNextTrack() {
         if (!this.albumContext || this.currentTrackIndex >= this.albumContext.tracks.length - 1) return;
         
         const nextTrack = this.albumContext.tracks[this.currentTrackIndex + 1];
-        this.playTrack(nextTrack.id, nextTrack.title, nextTrack.artist || this.albumContext.album.artist, this.albumContext);
+        this.playTrack(nextTrack.id);
     }
 }
 
