@@ -88,8 +88,7 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
     def api_scan() -> Response:
         """Trigger library scan."""
         if app.scanner.scanning:
-            response = jsonify({'status': 'already_scanning'})
-            return response
+            return jsonify({'status': 'already_scanning'})
         
         # Start scan in background
         def scan_thread() -> None:
@@ -97,14 +96,12 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
             print(f"Scan completed: {stats}")
         
         threading.Thread(target=scan_thread, daemon=True).start()
-        response = jsonify({'status': 'scan_started'})
-        return response
+        return jsonify({'status': 'scan_started'})
     
     @app.route('/api/scan/status')
     def api_scan_status() -> Response:
         """Get scan status."""
-        response = jsonify({'scanning': app.scanner.scanning})
-        return response
+        return jsonify({'scanning': app.scanner.scanning})
     
     @app.route('/stream/<int:track_id>')
     def stream_track(track_id: int) -> Response:
@@ -124,8 +121,7 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
         app.db.increment_play_count(track_id)
         
         # For now, serve file directly (transcoding will be added later)
-        response = send_file(track_path, as_attachment=False)
-        return response
+        return send_file(track_path, as_attachment=False)
     
     @app.route('/art/<int:album_id>')
     def album_art(album_id: int) -> Response:
@@ -137,8 +133,7 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
             art_path = Path(album['art_path'])
             assert art_path.exists(), f"Art file not found: {art_path}"
             
-            response = send_file(art_path)
-            return response
+            return send_file(art_path)
         except AssertionError:
             abort(404)
     

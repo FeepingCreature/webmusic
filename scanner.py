@@ -21,7 +21,7 @@ class MusicScanner:
         self.library_path = Path(library_path)
         self.db = db
         self.scanning = False
-        self._stop_scan = False
+        self._stop_event = threading.Event()
     
     def find_album_art(self, album_path: Path) -> str | None:
         """Find album art in the album directory."""
@@ -151,12 +151,12 @@ class MusicScanner:
         assert not self.scanning, "Scan already in progress"
         
         self.scanning = True
-        self._stop_scan = False
+        self._stop_event.clear()
         stats = {'albums_scanned': 0, 'albums_updated': 0}
         
         try:
             for root, dirs, files in os.walk(self.library_path, followlinks=True):
-                if self._stop_scan:
+                if self._stop_event.is_set():
                     break
                 
                 root_path = Path(root)
@@ -180,18 +180,14 @@ class MusicScanner:
     def scan_library_background(self, interval: int = 300) -> threading.Thread:
         """Run library scan in background thread."""
         def scan_loop() -> None:
-            while True:
-                if self._stop_scan:
-                    break
+            while not self._stop_event.is_set():
                 print("Starting background library scan...")
                 stats = self.scan_library()
                 print(f"Scan complete: {stats}")
                 
-                # Wait for next scan
-                for _ in range(interval):
-                    if self._stop_scan:
-                        break
-                    time.sleep(1)
+                # Wait for next scan or stop event
+                if self._stop_event.wait(timeout=interval):
+                    break
         
         thread = threading.Thread(target=scan_loop, daemon=True)
         thread.start()
@@ -199,5 +195,5 @@ class MusicScanner:
     
     def stop_scanning(self) -> None:
         """Stop background scanning."""
-        self._stop_scan = True
+        self._stop_event.set()
         self.scanning = False
