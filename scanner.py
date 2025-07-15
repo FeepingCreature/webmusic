@@ -9,12 +9,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import mutagen
 
 from database import Database
+from cue_parser import parse_cue_file, CueSheet
 
 
 class MusicScanner:
     """Scans filesystem for music files and updates database."""
     
     AUDIO_EXTENSIONS = {'.mp3', '.flac', '.ogg', '.m4a', '.wav', '.tta'}
+    CUE_EXTENSIONS = {'.cue'}
     ART_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp'}
     ART_FILENAMES = {'cover', 'folder', 'album', 'front'}
     
@@ -114,6 +116,21 @@ class MusicScanner:
         if not self.db.album_needs_update(album_path_bytes, last_modified):
             return False
         
+        # Look for CUE files first
+        cue_files = [f for f in album_path.iterdir() if f.suffix.lower() in self.CUE_EXTENSIONS]
+        
+        if cue_files:
+            # Process CUE/TTA album
+            return self.scan_cue_album(album_path, cue_files[0])
+        else:
+            # Process regular audio files
+            return self.scan_regular_album(album_path)
+    
+    def scan_regular_album(self, album_path: Path) -> bool:
+        """Scan an album with individual audio files."""
+        album_path_bytes = os.fsencode(album_path)
+        last_modified = album_path.stat().st_mtime
+        
         # Find audio files
         audio_files = []
         for file in album_path.iterdir():
@@ -155,6 +172,57 @@ class MusicScanner:
         
         return True
     
+    def scan_cue_album(self, album_path: Path, cue_file: Path) -> bool:
+        """Scan an album with CUE file."""
+        album_path_bytes = os.fsencode(album_path)
+        last_modified = album_path.stat().st_mtime
+        
+        # Parse CUE file
+        cue_sheet = parse_cue_file(cue_file)
+        if not cue_sheet or not cue_sheet.tracks:
+            return False
+        
+        # Verify audio file exists
+        audio_file_path = cue_sheet.get_audio_file_path()
+        if not audio_file_path:
+            return False
+        
+        # Use CUE metadata for album info
+        album_name = cue_sheet.album_title or album_path.name
+        album_artist = cue_sheet.album_performer
+        
+        # Find album art
+        art_path = self.find_album_art(album_path)
+        art_path_bytes = os.fsencode(art_path) if art_path else None
+        
+        # Add album to database
+        album_id = self.db.add_album(
+            path=album_path_bytes,
+            name=album_name,
+            artist=album_artist,
+            last_modified=last_modified,
+            art_path=art_path_bytes
+        )
+        
+        # Add tracks from CUE
+        for track in cue_sheet.tracks:
+            duration = None
+            if track.end_time is not None:
+                duration = track.end_time - track.start_time
+            
+            self.db.add_track(
+                album_id=album_id,
+                path=os.fsencode(audio_file_path),
+                title=track.title,
+                artist=track.performer or album_artist,
+                duration=duration,
+                track_number=track.number,
+                cue_start=track.start_time,
+                cue_end=track.end_time
+            )
+        
+        return True
+    
     def scan_library(self) -> Dict[str, int]:
         """Scan the entire music library."""
         assert not self.scanning, "Scan already in progress"
@@ -175,13 +243,17 @@ class MusicScanner:
                 
                 root_path = Path(os.fsdecode(root))
                 
-                # Check if this directory contains audio files (leaf directory)
+                # Check if this directory contains audio files or CUE files (leaf directory)
                 has_audio = any(
                     Path(os.fsdecode(root), os.fsdecode(f)).suffix.lower() in self.AUDIO_EXTENSIONS 
                     for f in files
                 )
+                has_cue = any(
+                    Path(os.fsdecode(root), os.fsdecode(f)).suffix.lower() in self.CUE_EXTENSIONS
+                    for f in files
+                )
                 
-                if has_audio:
+                if has_audio or has_cue:
                     album_dirs.append(root_path)
             
             print(f"Found {len(album_dirs)} album directories")

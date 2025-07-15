@@ -4,12 +4,13 @@ import argparse
 import os
 import threading
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file, abort
+from flask import Flask, render_template, request, jsonify, send_file, abort, Response as FlaskResponse
 from flask.wrappers import Response
 from typing import Any, Dict, List
 
 from database import Database
 from scanner import MusicScanner
+from transcoder import AudioTranscoder
 
 
 def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
@@ -17,13 +18,15 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.urandom(24)
     
-    # Initialize database and scanner
+    # Initialize database, scanner, and transcoder
     db = Database()
     scanner = MusicScanner(library_path, db)
+    transcoder = AudioTranscoder()
     
     # Store in app context
     app.db = db
     app.scanner = scanner
+    app.transcoder = transcoder
     app.library_path = Path(library_path)
     app.auth_enabled = auth_enabled
     
@@ -88,9 +91,24 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
         """Get scan status."""
         return jsonify({'scanning': app.scanner.scanning})
     
+    @app.route('/api/profiles')
+    def api_profiles() -> Response:
+        """Get available transcoding profiles."""
+        from transcoder import TRANSCODING_PROFILES
+        profiles = {
+            name: {
+                'name': profile.name,
+                'codec': profile.codec,
+                'bitrate': profile.bitrate,
+                'format': profile.format
+            }
+            for name, profile in TRANSCODING_PROFILES.items()
+        }
+        return jsonify(profiles)
+    
     @app.route('/stream/<int:track_id>')
-    def stream_track(track_id: int) -> Response:
-        """Stream audio file."""
+    def stream_track(track_id: int) -> FlaskResponse:
+        """Stream audio file with optional transcoding."""
         # Get track from database
         with app.db.get_connection() as conn:
             track = conn.execute(
@@ -106,8 +124,37 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
         # Increment play count
         app.db.increment_play_count(track_id)
         
-        # For now, serve file directly (transcoding will be added later)
-        return send_file(track_path, as_attachment=False)
+        # Get transcoding profile from query parameter
+        profile = request.args.get('profile', 'raw')
+        
+        # Check if this is a CUE track (has cue_start)
+        if track['cue_start'] is not None:
+            # Stream CUE track segment
+            start_time = track['cue_start']
+            duration = None
+            if track['cue_end'] is not None:
+                duration = track['cue_end'] - track['cue_start']
+            
+            def generate():
+                for chunk in app.transcoder.stream_audio(track_path, profile, start_time, duration):
+                    yield chunk
+            
+            content_type = app.transcoder.get_content_type(profile)
+            return FlaskResponse(generate(), mimetype=content_type)
+        
+        else:
+            # Regular audio file
+            if profile == 'raw':
+                # Serve file directly for raw profile
+                return send_file(track_path, as_attachment=False)
+            else:
+                # Transcode entire file
+                def generate():
+                    for chunk in app.transcoder.stream_audio(track_path, profile):
+                        yield chunk
+                
+                content_type = app.transcoder.get_content_type(profile)
+                return FlaskResponse(generate(), mimetype=content_type)
     
     @app.route('/art/<int:album_id>')
     def album_art(album_id: int) -> Response:
