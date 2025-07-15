@@ -41,8 +41,26 @@ class WebMusicPlayer {
         });
         
         this.audio.addEventListener('ended', () => {
-            this.playPauseButton.textContent = '▶';
-            this.currentTrackElement.textContent = 'No track playing';
+            if (this.albumContext && this.currentTrackIndex < this.albumContext.tracks.length - 1) {
+                // Auto-advance to next track in album
+                this.playNextTrack();
+            } else {
+                // End of album or single track
+                this.playPauseButton.textContent = '▶';
+                if (!this.albumContext) {
+                    this.currentTrackElement.textContent = 'No track playing';
+                    this.clearAlbumMode();
+                }
+            }
+        });
+        
+        // Previous/Next track controls
+        this.prevButton.addEventListener('click', () => {
+            this.playPreviousTrack();
+        });
+        
+        this.nextButton.addEventListener('click', () => {
+            this.playNextTrack();
         });
         
         this.audio.addEventListener('error', (e) => {
