@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Albums - WebMusic{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Albums</h1>
+    <div class="page-actions">
+        <button onclick="triggerScan()">Scan Library</button>
+    </div>
+</div>
+
+<div class="albums-grid">
+    {% for album in albums %}
+    <div class="album-card">
+        <a href="{{ url_for('album_detail', album_id=album.id) }}">
+            {% if album.art_path %}
+            <img src="{{ url_for('album_art', album_id=album.id) }}" 
+                 alt="{{ album.name }}" class="album-art">
+            {% else %}
+            <div class="album-art-placeholder">♪</div>
+            {% endif %}
+            <div class="album-info">
+                <h3 class="album-title">{{ album.name }}</h3>
+                <p class="album-artist">{{ album.artist or 'Unknown Artist' }}</p>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not albums %}
+<div class="empty-state">
+    <p>No albums found. Try scanning your library.</p>
+</div>
+{% endif %}
+
+<script>
+function triggerScan() {
+    fetch('/api/scan')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'scan_started') {
+                alert('Library scan started');
+            } else if (data.status === 'already_scanning') {
+                alert('Scan already in progress');
+            }
+        });
+}
+</script>
+{% endblock %}

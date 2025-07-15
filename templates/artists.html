@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Artists - WebMusic{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Artists</h1>
+</div>
+
+<div class="artists-list">
+    {% for artist in artists %}
+    <div class="artist-item">
+        <h3 class="artist-name">{{ artist.name }}</h3>
+        <p class="artist-info">{{ artist.album_count }} album{{ 's' if artist.album_count != 1 else '' }}</p>
+        
+        <div class="artist-albums">
+            {% for album in artist.albums %}
+            <div class="artist-album">
+                <a href="{{ url_for('album_detail', album_id=album.id) }}">
+                    {{ album.name }}
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not artists %}
+<div class="empty-state">
+    <p>No artists found.</p>
+</div>
+{% endif %}
+{% endblock %}

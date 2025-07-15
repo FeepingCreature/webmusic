@@ -1,0 +1,181 @@
+"""Main Flask application for WebMusic."""
+
+import argparse
+import os
+from pathlib import Path
+from flask import Flask, render_template, request, jsonify, send_file, abort
+from werkzeug.exceptions import NotFound
+
+from database import Database
+from scanner import MusicScanner
+
+
+def create_app(library_path: str, auth_enabled: bool = False):
+    """Create and configure Flask application."""
+    app = Flask(__name__)
+    app.config['SECRET_KEY'] = os.urandom(24)
+    
+    # Initialize database and scanner
+    db = Database()
+    scanner = MusicScanner(library_path, db)
+    
+    # Store in app context
+    app.db = db
+    app.scanner = scanner
+    app.library_path = Path(library_path)
+    app.auth_enabled = auth_enabled
+    
+    @app.route('/')
+    def index():
+        """Main page - redirect to albums."""
+        return albums()
+    
+    @app.route('/albums')
+    def albums():
+        """Albums page."""
+        page = request.args.get('page', 1, type=int)
+        limit = 50
+        offset = (page - 1) * limit
+        
+        albums_list = app.db.get_albums(limit=limit, offset=offset)
+        return render_template('albums.html', albums=albums_list, page=page)
+    
+    @app.route('/album/<int:album_id>')
+    def album_detail(album_id):
+        """Album detail page."""
+        album = app.db.get_album_by_id(album_id)
+        if not album:
+            abort(404)
+        
+        tracks = app.db.get_tracks_by_album(album_id)
+        return render_template('album_detail.html', album=album, tracks=tracks)
+    
+    @app.route('/artists')
+    def artists():
+        """Artists page."""
+        # Get unique artists from albums
+        albums_list = app.db.get_albums()
+        artists_dict = {}
+        
+        for album in albums_list:
+            artist = album['artist'] or 'Unknown Artist'
+            if artist not in artists_dict:
+                artists_dict[artist] = []
+            artists_dict[artist].append(album)
+        
+        artists_list = [
+            {'name': name, 'albums': albums, 'album_count': len(albums)}
+            for name, albums in sorted(artists_dict.items())
+        ]
+        
+        return render_template('artists.html', artists=artists_list)
+    
+    @app.route('/search')
+    def search():
+        """Search page."""
+        query = request.args.get('q', '').strip()
+        results = {'albums': [], 'tracks': []}
+        
+        if query:
+            results['albums'] = app.db.search_albums(query)
+            results['tracks'] = app.db.search_tracks(query)
+        
+        return render_template('search.html', query=query, results=results)
+    
+    @app.route('/api/scan')
+    def api_scan():
+        """Trigger library scan."""
+        if app.scanner.scanning:
+            return jsonify({'status': 'already_scanning'})
+        
+        # Start scan in background
+        import threading
+        def scan_thread():
+            stats = app.scanner.scan_library()
+            print(f"Scan completed: {stats}")
+        
+        threading.Thread(target=scan_thread, daemon=True).start()
+        return jsonify({'status': 'scan_started'})
+    
+    @app.route('/api/scan/status')
+    def api_scan_status():
+        """Get scan status."""
+        return jsonify({'scanning': app.scanner.scanning})
+    
+    @app.route('/stream/<int:track_id>')
+    def stream_track(track_id):
+        """Stream audio file."""
+        # Get track from database
+        with app.db.get_connection() as conn:
+            track = conn.execute(
+                "SELECT * FROM tracks WHERE id = ?", (track_id,)
+            ).fetchone()
+        
+        if not track:
+            abort(404)
+        
+        track_path = Path(track['path'])
+        if not track_path.exists():
+            abort(404)
+        
+        # Increment play count
+        app.db.increment_play_count(track_id)
+        
+        # For now, serve file directly (transcoding will be added later)
+        return send_file(track_path, as_attachment=False)
+    
+    @app.route('/art/<int:album_id>')
+    def album_art(album_id):
+        """Serve album art."""
+        album = app.db.get_album_by_id(album_id)
+        if not album or not album['art_path']:
+            abort(404)
+        
+        art_path = Path(album['art_path'])
+        if not art_path.exists():
+            abort(404)
+        
+        return send_file(art_path)
+    
+    return app
+
+
+def main():
+    """Main entry point."""
+    parser = argparse.ArgumentParser(description='WebMusic - Lightweight music server')
+    parser.add_argument('--library', required=True, help='Path to music library')
+    parser.add_argument('--port', type=int, default=8080, help='Port to run on')
+    parser.add_argument('--host', default='127.0.0.1', help='Host to bind to')
+    parser.add_argument('--auth', choices=['required', 'optional', 'disabled'], 
+                       default='disabled', help='Authentication mode')
+    parser.add_argument('--scan-interval', type=int, default=300, 
+                       help='Background scan interval in seconds')
+    
+    args = parser.parse_args()
+    
+    if not os.path.exists(args.library):
+        print(f"Error: Library path '{args.library}' does not exist")
+        return 1
+    
+    # Create Flask app
+    auth_enabled = args.auth in ['required', 'optional']
+    app = create_app(args.library, auth_enabled)
+    
+    # Start background scanner
+    if args.scan_interval > 0:
+        print(f"Starting background scanner (interval: {args.scan_interval}s)")
+        app.scanner.scan_library_background(args.scan_interval)
+    
+    # Initial scan
+    print("Performing initial library scan...")
+    stats = app.scanner.scan_library()
+    print(f"Initial scan complete: {stats}")
+    
+    print(f"Starting WebMusic on http://{args.host}:{args.port}")
+    print(f"Library: {args.library}")
+    
+    app.run(host=args.host, port=args.port, debug=False)
+
+
+if __name__ == '__main__':
+    main()

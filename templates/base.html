@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}WebMusic{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="player-header">
+        <div class="now-playing">
+            <span class="music-icon">♪</span>
+            <span id="current-track">No track playing</span>
+        </div>
+        <div class="player-controls">
+            <button id="play-pause">⏸</button>
+        </div>
+    </header>
+    
+    <div class="main-container">
+        <nav class="sidebar">
+            <ul class="nav-menu">
+                <li><a href="{{ url_for('albums') }}">Albums</a></li>
+                <li><a href="{{ url_for('artists') }}">Artists</a></li>
+                <li><a href="{{ url_for('search') }}">Search</a></li>
+            </ul>
+        </nav>
+        
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    
+    <audio id="audio-player" preload="none"></audio>
+    
+    <script src="{{ url_for('static', filename='js/player.js') }}"></script>
+</body>
+</html>
