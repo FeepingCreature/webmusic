@@ -43,12 +43,12 @@ def create_app(library_path: str, auth_enabled: bool = False):
     @app.route('/album/<int:album_id>')
     def album_detail(album_id):
         """Album detail page."""
-        album = app.db.get_album_by_id(album_id)
-        if not album:
+        try:
+            album = app.db.get_album_by_id(album_id)
+            tracks = app.db.get_tracks_by_album(album_id)
+            return render_template('album_detail.html', album=album, tracks=tracks)
+        except AssertionError:
             abort(404)
-        
-        tracks = app.db.get_tracks_by_album(album_id)
-        return render_template('album_detail.html', album=album, tracks=tracks)
     
     @app.route('/artists')
     def artists():
@@ -111,12 +111,10 @@ def create_app(library_path: str, auth_enabled: bool = False):
                 "SELECT * FROM tracks WHERE id = ?", (track_id,)
             ).fetchone()
         
-        if not track:
-            abort(404)
+        assert track, f"Track not found: {track_id}"
         
         track_path = Path(track['path'])
-        if not track_path.exists():
-            abort(404)
+        assert track_path.exists(), f"Track file not found: {track_path}"
         
         # Increment play count
         app.db.increment_play_count(track_id)
@@ -127,15 +125,16 @@ def create_app(library_path: str, auth_enabled: bool = False):
     @app.route('/art/<int:album_id>')
     def album_art(album_id):
         """Serve album art."""
-        album = app.db.get_album_by_id(album_id)
-        if not album or not album['art_path']:
+        try:
+            album = app.db.get_album_by_id(album_id)
+            assert album['art_path'], f"No art path for album: {album_id}"
+            
+            art_path = Path(album['art_path'])
+            assert art_path.exists(), f"Art file not found: {art_path}"
+            
+            return send_file(art_path)
+        except AssertionError:
             abort(404)
-        
-        art_path = Path(album['art_path'])
-        if not art_path.exists():
-            abort(404)
-        
-        return send_file(art_path)
     
     return app
 
@@ -153,9 +152,7 @@ def main():
     
     args = parser.parse_args()
     
-    if not os.path.exists(args.library):
-        print(f"Error: Library path '{args.library}' does not exist")
-        return 1
+    assert os.path.exists(args.library), f"Library path does not exist: {args.library}"
     
     # Create Flask app
     auth_enabled = args.auth in ['required', 'optional']

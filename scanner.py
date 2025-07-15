@@ -41,27 +41,10 @@ class MusicScanner:
     
     def extract_metadata(self, file_path: Path) -> Dict[str, Any]:
         """Extract metadata from audio file."""
-        try:
-            audio_file = mutagen.File(str(file_path))
-            if not audio_file:
-                return {}
-            
-            metadata = {
-                'title': self._get_tag(audio_file, ['TIT2', 'TITLE', '\xa9nam']),
-                'artist': self._get_tag(audio_file, ['TPE1', 'ARTIST', '\xa9ART']),
-                'album': self._get_tag(audio_file, ['TALB', 'ALBUM', '\xa9alb']),
-                'track_number': self._get_track_number(audio_file),
-                'duration': getattr(audio_file.info, 'length', 0)
-            }
-            
-            # Use filename as title if not found in tags
-            if not metadata['title']:
-                metadata['title'] = file_path.stem
-            
-            return metadata
-            
-        except (ID3NoHeaderError, Exception):
-            # Fallback to filename
+        audio_file = mutagen.File(str(file_path))
+        
+        # Handle files that mutagen can't read
+        if not audio_file:
             return {
                 'title': file_path.stem,
                 'artist': None,
@@ -69,6 +52,20 @@ class MusicScanner:
                 'track_number': None,
                 'duration': 0
             }
+        
+        metadata = {
+            'title': self._get_tag(audio_file, ['TIT2', 'TITLE', '\xa9nam']),
+            'artist': self._get_tag(audio_file, ['TPE1', 'ARTIST', '\xa9ART']),
+            'album': self._get_tag(audio_file, ['TALB', 'ALBUM', '\xa9alb']),
+            'track_number': self._get_track_number(audio_file),
+            'duration': getattr(audio_file.info, 'length', 0)
+        }
+        
+        # Use filename as title if not found in tags
+        if not metadata['title']:
+            metadata['title'] = file_path.stem
+        
+        return metadata
     
     def _get_tag(self, audio_file, tag_names: List[str]) -> Optional[str]:
         """Get tag value from audio file, trying multiple tag formats."""
@@ -103,8 +100,7 @@ class MusicScanner:
     
     def scan_album(self, album_path: Path) -> bool:
         """Scan a single album directory."""
-        if not album_path.is_dir():
-            return False
+        assert album_path.is_dir(), f"Path is not a directory: {album_path}"
         
         # Check if album needs updating
         last_modified = album_path.stat().st_mtime
@@ -153,8 +149,7 @@ class MusicScanner:
     
     def scan_library(self) -> Dict[str, int]:
         """Scan the entire music library."""
-        if self.scanning:
-            return {'error': 'Scan already in progress'}
+        assert not self.scanning, "Scan already in progress"
         
         self.scanning = True
         self._stop_scan = False

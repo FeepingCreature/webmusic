@@ -125,11 +125,12 @@ class Database:
         with self.get_connection() as conn:
             return [dict(row) for row in conn.execute(query, params)]
     
-    def get_album_by_id(self, album_id: int) -> Optional[Dict[str, Any]]:
+    def get_album_by_id(self, album_id: int) -> Dict[str, Any]:
         """Get a specific album by ID."""
         with self.get_connection() as conn:
             row = conn.execute("SELECT * FROM albums WHERE id = ?", (album_id,)).fetchone()
-            return dict(row) if row else None
+            assert row, f"Album not found: {album_id}"
+            return dict(row)
     
     def get_tracks_by_album(self, album_id: int) -> List[Dict[str, Any]]:
         """Get all tracks for a specific album."""
