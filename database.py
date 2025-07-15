@@ -98,15 +98,43 @@ class Database:
                   cue_end: float | None = None) -> int:
         """Add or update a track in the database."""
         with self.get_connection() as conn:
-            cursor = conn.execute("""
-                INSERT OR REPLACE INTO tracks 
-                (album_id, path, title, artist, duration, track_number, cue_start, cue_end)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (album_id, path, title, artist, duration, track_number, cue_start, cue_end))
+            # For CUE tracks, we need to handle the case where multiple tracks
+            # have the same file path but different cue_start times
+            if cue_start is not None:
+                # Check if this exact CUE track already exists
+                existing = conn.execute("""
+                    SELECT id FROM tracks 
+                    WHERE album_id = ? AND path = ? AND cue_start = ?
+                """, (album_id, path, cue_start)).fetchone()
+                
+                if existing:
+                    # Update existing CUE track
+                    track_id = existing['id']
+                    conn.execute("""
+                        UPDATE tracks 
+                        SET title = ?, artist = ?, duration = ?, track_number = ?, cue_end = ?
+                        WHERE id = ?
+                    """, (title, artist, duration, track_number, cue_end, track_id))
+                else:
+                    # Insert new CUE track
+                    cursor = conn.execute("""
+                        INSERT INTO tracks 
+                        (album_id, path, title, artist, duration, track_number, cue_start, cue_end)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (album_id, path, title, artist, duration, track_number, cue_start, cue_end))
+                    assert cursor.lastrowid is not None
+                    track_id = cursor.lastrowid
+            else:
+                # Regular track - use INSERT OR REPLACE
+                cursor = conn.execute("""
+                    INSERT OR REPLACE INTO tracks 
+                    (album_id, path, title, artist, duration, track_number, cue_start, cue_end)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (album_id, path, title, artist, duration, track_number, cue_start, cue_end))
+                assert cursor.lastrowid is not None
+                track_id = cursor.lastrowid
             
             # Initialize stats for new track
-            assert cursor.lastrowid is not None
-            track_id = cursor.lastrowid
             now = datetime.now().timestamp()
             conn.execute("""
                 INSERT OR IGNORE INTO stats (track_id, date_added)

@@ -178,22 +178,33 @@ class MusicScanner:
         last_modified = album_path.stat().st_mtime
         
         # Parse CUE file
+        print(f"  → Parsing CUE file: {cue_file.name}")
         cue_sheet = parse_cue_file(cue_file)
         if not cue_sheet or not cue_sheet.tracks:
+            print(f"  → Failed to parse CUE file or no tracks found")
             return False
+        
+        print(f"  → Found {len(cue_sheet.tracks)} tracks in CUE file")
         
         # Verify audio file exists
         audio_file_path = cue_sheet.get_audio_file_path()
         if not audio_file_path:
+            print(f"  → Audio file not found: {cue_sheet.audio_file}")
             return False
+        
+        print(f"  → Audio file: {audio_file_path.name}")
         
         # Use CUE metadata for album info
         album_name = cue_sheet.album_title or album_path.name
         album_artist = cue_sheet.album_performer
         
+        print(f"  → Album: {album_name} by {album_artist or 'Unknown Artist'}")
+        
         # Find album art
         art_path = self.find_album_art(album_path)
         art_path_bytes = os.fsencode(art_path) if art_path else None
+        if art_path:
+            print(f"  → Found album art: {Path(art_path).name}")
         
         # Add album to database
         album_id = self.db.add_album(
@@ -205,12 +216,14 @@ class MusicScanner:
         )
         
         # Add tracks from CUE
-        for track in cue_sheet.tracks:
+        for i, track in enumerate(cue_sheet.tracks):
             duration = None
             if track.end_time is not None:
                 duration = track.end_time - track.start_time
             
-            self.db.add_track(
+            print(f"  → Adding track {track.number}: {track.title} ({track.start_time:.2f}s - {track.end_time:.2f}s if track.end_time else 'end'})")
+            
+            track_id = self.db.add_track(
                 album_id=album_id,
                 path=os.fsencode(audio_file_path),
                 title=track.title,
@@ -220,7 +233,10 @@ class MusicScanner:
                 cue_start=track.start_time,
                 cue_end=track.end_time
             )
+            
+            print(f"  → Track added with ID: {track_id}")
         
+        print(f"  → Successfully added {len(cue_sheet.tracks)} tracks")
         return True
     
     def scan_library(self) -> Dict[str, int]:
