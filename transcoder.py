@@ -20,7 +20,7 @@ class TranscodingProfile:
 
 # Predefined transcoding profiles
 TRANSCODING_PROFILES: Dict[str, TranscodingProfile] = {
-    'raw': TranscodingProfile('raw', 'copy'),
+    'raw': TranscodingProfile('raw', 'copy', format='wav'),
     'mp3_320': TranscodingProfile('mp3_320', 'libmp3lame', '320k', 'mp3'),
     'mp3_192': TranscodingProfile('mp3_192', 'libmp3lame', '192k', 'mp3'),
     'mp3_128': TranscodingProfile('mp3_128', 'libmp3lame', '128k', 'mp3'),
@@ -60,7 +60,13 @@ class AudioTranscoder:
             if profile.bitrate:
                 cmd.extend(['-ab', profile.bitrate])
         else:
-            cmd.extend(['-c', 'copy'])
+            # For 'raw' profile, we still need to transcode incompatible formats
+            # TTA, APE, and other formats can't be copied to WAV
+            if profile.format == 'wav' or not profile.format:
+                # Force PCM encoding for WAV output
+                cmd.extend(['-acodec', 'pcm_s16le'])
+            else:
+                cmd.extend(['-c', 'copy'])
         
         # Format
         if profile.format:
