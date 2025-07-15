@@ -4,8 +4,18 @@ class WebMusicPlayer {
     constructor() {
         this.audio = document.getElementById('audio-player');
         this.currentTrackElement = document.getElementById('current-track');
+        this.currentAlbumElement = document.getElementById('current-album');
         this.playPauseButton = document.getElementById('play-pause');
+        this.prevButton = document.getElementById('prev-track');
+        this.nextButton = document.getElementById('next-track');
+        this.albumArtMini = document.getElementById('album-art-mini');
+        this.albumArtImg = document.getElementById('album-art-img');
+        this.musicIcon = document.getElementById('music-icon');
         this.contentElement = document.querySelector('.content');
+        
+        // Album playback state
+        this.albumContext = null;
+        this.currentTrackIndex = -1;
         
         this.setupEventListeners();
         this.setupLinkHijacking();
@@ -182,10 +192,72 @@ class WebMusicPlayer {
         }
     }
     
-    playTrack(trackId, title, artist) {
+    playTrack(trackId, title, artist, albumContext = null) {
         this.audio.src = `/stream/${trackId}`;
         this.audio.play();
         this.currentTrackElement.textContent = `${artist} - ${title}`;
+        
+        if (albumContext) {
+            this.setAlbumContext(albumContext, trackId);
+        } else {
+            this.clearAlbumMode();
+        }
+    }
+    
+    setAlbumContext(albumContext, currentTrackId) {
+        this.albumContext = albumContext;
+        this.currentTrackIndex = albumContext.tracks.findIndex(track => track.id === currentTrackId);
+        
+        // Show album info in header
+        this.currentAlbumElement.textContent = `${albumContext.album.artist || 'Unknown Artist'} - ${albumContext.album.name}`;
+        this.currentAlbumElement.classList.remove('hidden');
+        
+        // Show album art if available
+        if (albumContext.album.art_path) {
+            this.albumArtImg.src = `/art/${albumContext.album.id}`;
+            this.albumArtMini.classList.remove('hidden');
+            this.musicIcon.classList.add('hidden');
+        }
+        
+        // Show/hide prev/next buttons
+        this.prevButton.classList.remove('hidden');
+        this.nextButton.classList.remove('hidden');
+        this.updateNavigationButtons();
+    }
+    
+    clearAlbumMode() {
+        this.albumContext = null;
+        this.currentTrackIndex = -1;
+        
+        // Hide album info
+        this.currentAlbumElement.classList.add('hidden');
+        this.albumArtMini.classList.add('hidden');
+        this.musicIcon.classList.remove('hidden');
+        
+        // Hide prev/next buttons
+        this.prevButton.classList.add('hidden');
+        this.nextButton.classList.add('hidden');
+    }
+    
+    updateNavigationButtons() {
+        if (!this.albumContext) return;
+        
+        this.prevButton.disabled = this.currentTrackIndex <= 0;
+        this.nextButton.disabled = this.currentTrackIndex >= this.albumContext.tracks.length - 1;
+    }
+    
+    playPreviousTrack() {
+        if (!this.albumContext || this.currentTrackIndex <= 0) return;
+        
+        const prevTrack = this.albumContext.tracks[this.currentTrackIndex - 1];
+        this.playTrack(prevTrack.id, prevTrack.title, prevTrack.artist || this.albumContext.album.artist, this.albumContext);
+    }
+    
+    playNextTrack() {
+        if (!this.albumContext || this.currentTrackIndex >= this.albumContext.tracks.length - 1) return;
+        
+        const nextTrack = this.albumContext.tracks[this.currentTrackIndex + 1];
+        this.playTrack(nextTrack.id, nextTrack.title, nextTrack.artist || this.albumContext.album.artist, this.albumContext);
     }
 }
 
@@ -195,8 +267,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Global function for playing tracks (used by templates)
-function playTrack(trackId, title, artist) {
+function playTrack(trackId, title, artist, albumContext = null) {
     if (window.player) {
-        window.player.playTrack(trackId, title, artist);
+        window.player.playTrack(trackId, title, artist, albumContext);
     }
 }

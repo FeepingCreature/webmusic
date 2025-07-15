@@ -35,14 +35,30 @@
 </div>
 
 <script>
+// Create album context for sequential playback
+const albumContext = {
+    album: {
+        id: {{ album.id }},
+        name: {{ album.name|tojson }},
+        artist: {{ album.artist|tojson }},
+        art_path: {{ album.art_path|tojson }}
+    },
+    tracks: [
+        {% for track in tracks %}
+        {
+            id: {{ track.id }},
+            title: {{ track.title|tojson }},
+            artist: {{ track.artist|tojson }},
+            track_number: {{ track.track_number or loop.index }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ]
+};
+
 function playTrack(trackId, title, artist) {
-    const audio = document.getElementById('audio-player');
-    const currentTrack = document.getElementById('current-track');
-    
-    audio.src = `/stream/${trackId}`;
-    audio.play();
-    
-    currentTrack.textContent = `${artist} - ${title}`;
+    if (window.player) {
+        window.player.playTrack(trackId, title, artist, albumContext);
+    }
 }
 </script>
 {% endblock %}
