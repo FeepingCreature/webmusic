@@ -23,8 +23,6 @@ def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '
     app.config['SECRET_KEY'] = os.urandom(24)
     
     # Configure base path for reverse proxy support
-    if base_path_clean:
-        app.config['APPLICATION_ROOT'] = base_path_clean
     app.config['BASE_PATH'] = base_path_clean
     
     # Initialize database, scanner, and transcoder
