@@ -4,9 +4,8 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import mutagen
-from mutagen.id3 import ID3NoHeaderError
 
 from database import Database
 
@@ -24,7 +23,7 @@ class MusicScanner:
         self.scanning = False
         self._stop_scan = False
     
-    def find_album_art(self, album_path: Path) -> Optional[str]:
+    def find_album_art(self, album_path: Path) -> str | None:
         """Find album art in the album directory."""
         for filename in self.ART_FILENAMES:
             for ext in self.ART_EXTENSIONS:
@@ -67,7 +66,7 @@ class MusicScanner:
         
         return metadata
     
-    def _get_tag(self, audio_file, tag_names: List[str]) -> Optional[str]:
+    def _get_tag(self, audio_file: mutagen.FileType, tag_names: List[str]) -> str | None:
         """Get tag value from audio file, trying multiple tag formats."""
         for tag_name in tag_names:
             if tag_name in audio_file:
@@ -78,7 +77,7 @@ class MusicScanner:
                     return str(value)
         return None
     
-    def _get_track_number(self, audio_file) -> Optional[int]:
+    def _get_track_number(self, audio_file: mutagen.FileType) -> int | None:
         """Extract track number from various tag formats."""
         track_tags = ['TRCK', 'TRACKNUMBER', 'trkn']
         for tag_name in track_tags:
@@ -178,7 +177,7 @@ class MusicScanner:
         
         return stats
     
-    def scan_library_background(self, interval: int = 300):
+    def scan_library_background(self, interval: int = 300) -> threading.Thread:
         """Run library scan in background thread."""
         def scan_loop():
             while not self._stop_scan:
@@ -196,7 +195,7 @@ class MusicScanner:
         thread.start()
         return thread
     
-    def stop_scanning(self):
+    def stop_scanning(self) -> None:
         """Stop background scanning."""
         self._stop_scan = True
         self.scanning = False

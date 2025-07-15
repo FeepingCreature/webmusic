@@ -3,7 +3,7 @@
 import sqlite3
 import os
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 
 
 class Database:
@@ -19,7 +19,7 @@ class Database:
         conn.row_factory = sqlite3.Row
         return conn
     
-    def init_db(self):
+    def init_db(self) -> None:
         """Initialize database with required tables."""
         with self.get_connection() as conn:
             conn.executescript("""
@@ -75,8 +75,8 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
             """)
     
-    def add_album(self, path: str, name: str, artist: str = None, 
-                  last_modified: float = None, art_path: str = None) -> int:
+    def add_album(self, path: str, name: str, artist: str | None = None, 
+                  last_modified: float | None = None, art_path: str | None = None) -> int:
         """Add or update an album in the database."""
         if last_modified is None:
             last_modified = os.path.getmtime(path)
@@ -92,9 +92,9 @@ class Database:
             return cursor.lastrowid
     
     def add_track(self, album_id: int, path: str, title: str, 
-                  artist: str = None, duration: float = None,
-                  track_number: int = None, cue_start: float = None,
-                  cue_end: float = None) -> int:
+                  artist: str | None = None, duration: float | None = None,
+                  track_number: int | None = None, cue_start: float | None = None,
+                  cue_end: float | None = None) -> int:
         """Add or update a track in the database."""
         with self.get_connection() as conn:
             cursor = conn.execute("""
@@ -113,7 +113,7 @@ class Database:
             
             return track_id
     
-    def get_albums(self, limit: int = None, offset: int = 0) -> List[Dict[str, Any]]:
+    def get_albums(self, limit: int | None = None, offset: int = 0) -> List[Dict[str, Any]]:
         """Get all albums with optional pagination."""
         query = "SELECT * FROM albums ORDER BY name"
         params = []
@@ -165,7 +165,7 @@ class Database:
                 ORDER BY t.title
             """, (search_term, search_term))]
     
-    def increment_play_count(self, track_id: int):
+    def increment_play_count(self, track_id: int) -> None:
         """Increment play count and update last played time."""
         now = datetime.now().timestamp()
         with self.get_connection() as conn:

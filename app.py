@@ -2,9 +2,10 @@
 
 import argparse
 import os
+import threading
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file, abort
-from werkzeug.exceptions import NotFound
+from flask import Flask, render_template, request, jsonify, send_file, abort, Response
+from typing import Any
 
 from database import Database
 from scanner import MusicScanner
@@ -26,12 +27,12 @@ def create_app(library_path: str, auth_enabled: bool = False):
     app.auth_enabled = auth_enabled
     
     @app.route('/')
-    def index():
+    def index() -> str:
         """Main page - redirect to albums."""
         return albums()
     
     @app.route('/albums')
-    def albums():
+    def albums() -> str:
         """Albums page."""
         page = request.args.get('page', 1, type=int)
         limit = 50
@@ -41,7 +42,7 @@ def create_app(library_path: str, auth_enabled: bool = False):
         return render_template('albums.html', albums=albums_list, page=page)
     
     @app.route('/album/<int:album_id>')
-    def album_detail(album_id):
+    def album_detail(album_id: int) -> str:
         """Album detail page."""
         try:
             album = app.db.get_album_by_id(album_id)
@@ -51,7 +52,7 @@ def create_app(library_path: str, auth_enabled: bool = False):
             abort(404)
     
     @app.route('/artists')
-    def artists():
+    def artists() -> str:
         """Artists page."""
         # Get unique artists from albums
         albums_list = app.db.get_albums()
@@ -71,7 +72,7 @@ def create_app(library_path: str, auth_enabled: bool = False):
         return render_template('artists.html', artists=artists_list)
     
     @app.route('/search')
-    def search():
+    def search() -> str:
         """Search page."""
         query = request.args.get('q', '').strip()
         results = {'albums': [], 'tracks': []}
@@ -83,14 +84,13 @@ def create_app(library_path: str, auth_enabled: bool = False):
         return render_template('search.html', query=query, results=results)
     
     @app.route('/api/scan')
-    def api_scan():
+    def api_scan() -> Response:
         """Trigger library scan."""
         if app.scanner.scanning:
             return jsonify({'status': 'already_scanning'})
         
         # Start scan in background
-        import threading
-        def scan_thread():
+        def scan_thread() -> None:
             stats = app.scanner.scan_library()
             print(f"Scan completed: {stats}")
         
@@ -98,12 +98,12 @@ def create_app(library_path: str, auth_enabled: bool = False):
         return jsonify({'status': 'scan_started'})
     
     @app.route('/api/scan/status')
-    def api_scan_status():
+    def api_scan_status() -> Response:
         """Get scan status."""
         return jsonify({'scanning': app.scanner.scanning})
     
     @app.route('/stream/<int:track_id>')
-    def stream_track(track_id):
+    def stream_track(track_id: int) -> Response:
         """Stream audio file."""
         # Get track from database
         with app.db.get_connection() as conn:
@@ -123,7 +123,7 @@ def create_app(library_path: str, auth_enabled: bool = False):
         return send_file(track_path, as_attachment=False)
     
     @app.route('/art/<int:album_id>')
-    def album_art(album_id):
+    def album_art(album_id: int) -> Response:
         """Serve album art."""
         try:
             album = app.db.get_album_by_id(album_id)
@@ -139,7 +139,7 @@ def create_app(library_path: str, auth_enabled: bool = False):
     return app
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(description='WebMusic - Lightweight music server')
     parser.add_argument('--library', required=True, help='Path to music library')
