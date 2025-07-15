@@ -108,7 +108,9 @@ class MusicScanner:
     def scan_album(self, album_path: Path) -> bool:
         """Scan a single album directory."""
         try:
-            print(f"  → Starting scan of: {album_path.relative_to(self.library_path)}")
+            # Use repr() to safely handle non-UTF-8 paths
+            rel_path = repr(str(album_path.relative_to(self.library_path)))
+            print(f"  → Starting scan of: {rel_path}")
             
             assert album_path.is_dir(), f"Path is not a directory: {album_path}"
             
@@ -118,10 +120,12 @@ class MusicScanner:
             # Check if album needs updating
             last_modified = album_path.stat().st_mtime
             if not self.db.album_needs_update(album_path_bytes, last_modified):
-                print(f"  → Album up to date: {album_path.relative_to(self.library_path)}")
+                rel_path = repr(str(album_path.relative_to(self.library_path)))
+                print(f"  → Album up to date: {rel_path}")
                 return False
             
-            print(f"  → Album needs update: {album_path.relative_to(self.library_path)}")
+            rel_path = repr(str(album_path.relative_to(self.library_path)))
+            print(f"  → Album needs update: {rel_path}")
             
             # Look for CUE files first
             cue_files = [f for f in album_path.iterdir() if f.suffix.lower() in self.CUE_EXTENSIONS]
@@ -139,7 +143,9 @@ class MusicScanner:
                 print(f"  → Regular scan result: {result}")
                 return result
         except Exception as e:
-            print(f"  → Exception in scan_album for {album_path}: {e}")
+            # Use repr() to safely handle non-UTF-8 paths
+            path_repr = repr(str(album_path))
+            print(f"  → Exception in scan_album for {path_repr}: {e}")
             import traceback
             traceback.print_exc()
             raise
@@ -328,20 +334,24 @@ class MusicScanner:
                 
                     album_path = future_to_path[future]
                     try:
-                        print(f"Processing result for: {album_path.relative_to(self.library_path)}")
+                        # Use repr() to safely handle non-UTF-8 paths
+                        rel_path = repr(str(album_path.relative_to(self.library_path)))
+                        print(f"Processing result for: {rel_path}")
                         was_updated = future.result()
                         stats['albums_scanned'] += 1
                         if was_updated:
                             stats['albums_updated'] += 1
                     
-                        print(f"Scanned album: {album_path.relative_to(self.library_path)} {'(updated)' if was_updated else '(up to date)'}")
+                        print(f"Scanned album: {rel_path} {'(updated)' if was_updated else '(up to date)'}")
                     
                         # Progress update every 10 albums
                         if stats['albums_scanned'] % 10 == 0:
                             print(f"Progress: {stats['albums_scanned']}/{len(album_dirs)} albums scanned, {stats['albums_updated']} updated")
                 
                     except Exception as e:
-                        print(f"Error scanning {album_path.relative_to(self.library_path)}: {e}")
+                        # Use repr() to safely handle non-UTF-8 paths
+                        rel_path = repr(str(album_path.relative_to(self.library_path)))
+                        print(f"Error scanning {rel_path}: {e}")
                         print(f"Exception type: {type(e).__name__}")
                         import traceback
                         traceback.print_exc()
