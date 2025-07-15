@@ -155,7 +155,7 @@ def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '
     
     @app.route('/stream/<int:track_id>')
     def stream_track(track_id: int) -> FlaskResponse:
-        """Stream audio file with optional transcoding."""
+        """Stream audio file with optional transcoding and seeking."""
         # Get track from database
         with app.db.get_connection() as conn:
             track = conn.execute(
@@ -168,19 +168,28 @@ def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '
         track_path = Path(os.fsdecode(track['path']))
         assert track_path.exists(), f"Track file not found: {track_path}"
         
-        # Increment play count
-        app.db.increment_play_count(track_id)
+        # Increment play count (only if not seeking)
+        seek_time = request.args.get('seek', type=float)
+        if seek_time is None:
+            app.db.increment_play_count(track_id)
         
         # Get transcoding profile from query parameter
         profile = request.args.get('profile', 'raw')
         
         # Check if this is a CUE track (has cue_start)
         if track['cue_start'] is not None:
-            # Stream CUE track segment
+            # Stream CUE track segment with seek handling
             start_time = track['cue_start']
             duration = None
             if track['cue_end'] is not None:
                 duration = track['cue_end'] - track['cue_start']
+            
+            # Add seek offset to CUE start time
+            if seek_time is not None:
+                start_time += seek_time
+                # Adjust duration if we're seeking within the track
+                if duration is not None:
+                    duration = max(0, duration - seek_time)
             
             def generate():
                 for chunk in app.transcoder.stream_audio(track_path, profile, start_time, duration):
@@ -191,13 +200,13 @@ def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '
         
         else:
             # Regular audio file
-            if profile == 'raw':
-                # Serve file directly for raw profile
+            if profile == 'raw' and seek_time is None:
+                # Serve file directly for raw profile without seeking
                 return send_file_bytes(track_path)
             else:
-                # Transcode entire file
+                # Transcode with optional seeking
                 def generate():
-                    for chunk in app.transcoder.stream_audio(track_path, profile):
+                    for chunk in app.transcoder.stream_audio(track_path, profile, seek_time):
                         yield chunk
                 
                 content_type = app.transcoder.get_content_type(profile)

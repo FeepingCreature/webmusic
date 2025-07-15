@@ -13,9 +13,18 @@ class WebMusicPlayer {
         this.musicIcon = document.getElementById('music-icon');
         this.contentElement = document.querySelector('.content');
         
+        // Playback bar elements
+        this.currentTimeElement = document.getElementById('current-time');
+        this.durationElement = document.getElementById('duration');
+        this.progressContainer = document.getElementById('progress-container');
+        this.progressBar = document.getElementById('progress-bar');
+        this.progressHandle = document.getElementById('progress-handle');
+        
         // Album playback state
         this.albumContext = null;
         this.currentTrackIndex = -1;
+        this.currentTrackId = null;
+        this.seeking = false;
         
         this.setupEventListeners();
         this.setupLinkHijacking();
@@ -66,6 +75,44 @@ class WebMusicPlayer {
         this.audio.addEventListener('error', (e) => {
             console.error('Audio error:', e);
             this.currentTrackElement.textContent = 'Error playing track';
+        });
+        
+        // Progress bar updates
+        this.audio.addEventListener('timeupdate', () => {
+            if (!this.seeking) {
+                this.updateProgressBar();
+            }
+        });
+        
+        this.audio.addEventListener('loadedmetadata', () => {
+            this.updateDuration();
+        });
+        
+        this.audio.addEventListener('durationchange', () => {
+            this.updateDuration();
+        });
+        
+        // Progress bar seeking
+        this.progressContainer.addEventListener('click', (e) => {
+            this.handleSeek(e);
+        });
+        
+        this.progressContainer.addEventListener('mousedown', (e) => {
+            this.seeking = true;
+            this.handleSeek(e);
+            
+            const handleMouseMove = (e) => {
+                this.handleSeek(e);
+            };
+            
+            const handleMouseUp = () => {
+                this.seeking = false;
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+            
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
         });
     }
     
@@ -281,6 +328,7 @@ class WebMusicPlayer {
     
     playTrack(trackId, title, artist, albumContext = null) {
         const basePath = window.BASE_PATH || '';
+        this.currentTrackId = trackId;
         this.audio.src = `${basePath}/stream/${trackId}`;
         this.audio.play();
         this.currentTrackElement.textContent = `${artist} - ${title}`;
@@ -290,6 +338,54 @@ class WebMusicPlayer {
         } else {
             this.clearAlbumMode();
         }
+    }
+    
+    updateProgressBar() {
+        if (this.audio.duration && !isNaN(this.audio.duration)) {
+            const progress = (this.audio.currentTime / this.audio.duration) * 100;
+            this.progressBar.style.width = `${progress}%`;
+            this.progressHandle.style.left = `${progress}%`;
+            this.currentTimeElement.textContent = this.formatTime(this.audio.currentTime);
+        }
+    }
+    
+    updateDuration() {
+        if (this.audio.duration && !isNaN(this.audio.duration)) {
+            this.durationElement.textContent = this.formatTime(this.audio.duration);
+        }
+    }
+    
+    formatTime(seconds) {
+        if (!seconds || isNaN(seconds)) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    handleSeek(e) {
+        if (!this.audio.duration || !this.currentTrackId) return;
+        
+        const rect = this.progressContainer.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const progress = Math.max(0, Math.min(1, clickX / rect.width));
+        const seekTime = progress * this.audio.duration;
+        
+        // Update UI immediately for responsiveness
+        this.progressBar.style.width = `${progress * 100}%`;
+        this.progressHandle.style.left = `${progress * 100}%`;
+        this.currentTimeElement.textContent = this.formatTime(seekTime);
+        
+        // Make seek request to backend
+        this.seekToPosition(seekTime);
+    }
+    
+    seekToPosition(seekTime) {
+        const basePath = window.BASE_PATH || '';
+        const seekUrl = `${basePath}/stream/${this.currentTrackId}?seek=${seekTime}`;
+        
+        // Replace current audio source with seek URL
+        this.audio.src = seekUrl;
+        this.audio.play();
     }
     
     setAlbumContext(albumContext, currentTrackId) {
