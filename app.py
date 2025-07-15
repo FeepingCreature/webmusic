@@ -4,13 +4,43 @@ import argparse
 import os
 import threading
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file, abort, Response as FlaskResponse
+from flask import Flask, render_template, request, jsonify, abort, Response as FlaskResponse
 from flask.wrappers import Response
 from typing import Any, Dict, List
+import mimetypes
 
 from database import Database
 from scanner import MusicScanner
 from transcoder import AudioTranscoder
+
+
+def send_file_bytes(file_path: Path) -> Response:
+    """Send a file using raw bytes path to handle non-UTF-8 filenames."""
+    assert file_path.exists(), f"File not found: {file_path}"
+    
+    # Determine MIME type
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    if not mime_type:
+        mime_type = 'application/octet-stream'
+    
+    # Get file size
+    file_size = file_path.stat().st_size
+    
+    # Open and read file in binary mode
+    with open(file_path, 'rb') as f:
+        file_data = f.read()
+    
+    # Create response with proper headers
+    response = FlaskResponse(
+        file_data,
+        mimetype=mime_type,
+        headers={
+            'Content-Length': str(file_size),
+            'Cache-Control': 'public, max-age=3600'
+        }
+    )
+    
+    return response
 
 
 def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '') -> Flask:
@@ -158,7 +188,7 @@ def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '
             # Regular audio file
             if profile == 'raw':
                 # Serve file directly for raw profile
-                return send_file(track_path, as_attachment=False, download_name='audio')
+                return send_file_bytes(track_path)
             else:
                 # Transcode entire file
                 def generate():
@@ -179,7 +209,7 @@ def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '
             art_path = Path(os.fsdecode(album['art_path']))
             assert art_path.exists(), f"Art file not found: {art_path}"
             
-            return send_file(art_path, download_name='cover')
+            return send_file_bytes(art_path)
         except AssertionError:
             abort(404)
     
