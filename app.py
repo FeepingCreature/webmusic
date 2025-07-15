@@ -146,11 +146,6 @@ def main() -> None:
     auth_enabled = args.auth in ['required', 'optional']
     app = create_app(args.library, auth_enabled)
     
-    # Initial scan
-    print("Performing initial library scan...")
-    stats = app.scanner.scan_library()
-    print(f"Initial scan complete: {stats}")
-    
     # Start background scanner
     if args.scan_interval > 0:
         print(f"Starting background scanner (interval: {args.scan_interval}s)")
