@@ -41,17 +41,17 @@ for filename in os.listdir('.'):
     
     # Test fsencode/fsdecode round trip
     try:
-        encoded = os.fsencode(filename)
-        decoded = os.fsdecode(encoded)
-        print(f"    fsencode: {repr(encoded)}")
+        decoded = os.fsdecode(filename)
+        encoded = os.fsencode(decoded)
         print(f"    fsdecode: {repr(decoded)}")
-        print(f"    Round trip successful: {filename == decoded}")
+        print(f"    fsencode: {repr(encoded)}")
+        print(f"    Round trip successful: {filename == encoded}")
     except Exception as e:
         print(f"    Error in round trip: {e}")
     
     # Test if we can open the file
     try:
-        with open(filename, 'r') as f:
+        with open(decoded, 'r') as f:
             content = f.read().strip()
         print(f"    File content: {repr(content)}")
     except Exception as e:
@@ -66,20 +66,21 @@ import sqlite3
 conn = sqlite3.connect(':memory:')
 conn.execute('CREATE TABLE test (path TEXT)')
 
-for filename in os.listdir('.'):
+for filename in os.listdir(b'.'):
     try:
-        # Store the filename directly
         conn.execute('INSERT INTO test (path) VALUES (?)', (filename,))
         print(f"  Stored in SQLite: {repr(filename)}")
         
         # Retrieve it back
         result = conn.execute('SELECT path FROM test WHERE path = ?', (filename,)).fetchone()
         if result:
-            retrieved = result[0]
-            print(f"    Retrieved: {repr(retrieved)}")
-            print(f"    Match: {filename == retrieved}")
+            print(f"    Retrieved: {repr(result[0])}")
+            print(f"    Match: {filename == result[0]}")
         else:
             print(f"    Not found in database!")
+        with open(result[0], 'r') as f:
+            content = f.read().strip()
+            print(f"    File content: {repr(content)}")
     except Exception as e:
         print(f"  SQLite error for {repr(filename)}: {e}")
     print()
