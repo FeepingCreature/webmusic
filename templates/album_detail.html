@@ -18,22 +18,7 @@
     </div>
 </div>
 
-<div class="track-list" data-album-context="{{ {
-    'album': {
-        'id': album.id,
-        'name': album.name,
-        'artist': album.artist,
-        'art_path': album.art_path
-    },
-    'tracks': [
-        {
-            'id': track.id,
-            'title': track.title,
-            'artist': track.artist,
-            'track_number': track.track_number or loop.index
-        } for track in tracks
-    ]
-}|tojson|e }}">
+<div class="track-list" data-album-context='{"album": {"id": {{ album.id }}, "name": {{ album.name|tojson }}, "artist": {{ album.artist|tojson }}, "art_path": {{ album.art_path|tojson }}}, "tracks": [{% for track in tracks %}{"id": {{ track.id }}, "title": {{ track.title|tojson }}, "artist": {{ track.artist|tojson }}, "track_number": {{ track.track_number or loop.index }}}{% if not loop.last %},{% endif %}{% endfor %}]}'>
     {% for track in tracks %}
     <div class="track-item" data-track-id="{{ track.id }}">
         <span class="track-number">{{ track.track_number or loop.index }}</span>
