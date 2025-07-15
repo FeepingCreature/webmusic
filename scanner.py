@@ -221,7 +221,8 @@ class MusicScanner:
             if track.end_time is not None:
                 duration = track.end_time - track.start_time
             
-            print(f"  → Adding track {track.number}: {track.title} ({track.start_time:.2f}s - {track.end_time:.2f}s if track.end_time else 'end'})")
+            end_time_str = f"{track.end_time:.2f}s" if track.end_time else "end"
+            print(f"  → Adding track {track.number}: {track.title} ({track.start_time:.2f}s - {end_time_str})")
             
             track_id = self.db.add_track(
                 album_id=album_id,
