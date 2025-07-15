@@ -31,7 +31,7 @@ import os
 import sys
 
 print("Python filesystem encoding:", sys.getfilesystemencoding())
-print("Python filesystem error handler:", sys.getfilesystemencodeerrorpolicy())
+print("Python filesystem error handler:", sys.getfilesystemencodeerrors())
 print()
 
 # List all files in current directory
