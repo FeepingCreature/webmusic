@@ -75,11 +75,6 @@ body {
     text-overflow: ellipsis;
 }
 
-.player-controls {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-}
 
 .control-button {
     background: none;
@@ -114,9 +109,16 @@ body {
     display: flex;
     align-items: center;
     gap: 1rem;
-    min-width: 300px;
+    min-width: 600px;
     color: rgba(255, 255, 255, 0.8);
     font-size: 0.9rem;
+}
+
+.player-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-left: 1rem;
 }
 
 .progress-container {
