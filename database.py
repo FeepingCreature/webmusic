@@ -36,14 +36,15 @@ class Database:
                 CREATE TABLE IF NOT EXISTS tracks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     album_id INTEGER NOT NULL,
-                    path TEXT UNIQUE NOT NULL,
+                    path TEXT NOT NULL,
                     title TEXT NOT NULL,
                     artist TEXT,
                     duration REAL,
                     track_number INTEGER,
                     cue_start REAL,
                     cue_end REAL,
-                    FOREIGN KEY (album_id) REFERENCES albums (id)
+                    FOREIGN KEY (album_id) REFERENCES albums (id),
+                    UNIQUE(album_id, path, cue_start)
                 );
                 
                 CREATE TABLE IF NOT EXISTS stats (
@@ -72,6 +73,7 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_albums_path ON albums(path);
                 CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album_id);
                 CREATE INDEX IF NOT EXISTS idx_tracks_path ON tracks(path);
+                CREATE INDEX IF NOT EXISTS idx_tracks_cue ON tracks(album_id, path, cue_start);
                 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
             """)
     
