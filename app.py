@@ -4,14 +4,15 @@ import argparse
 import os
 import threading
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file, abort, Response
-from typing import Any
+from flask import Flask, render_template, request, jsonify, send_file, abort
+from flask.wrappers import Response
+from typing import Any, Dict, List
 
 from database import Database
 from scanner import MusicScanner
 
 
-def create_app(library_path: str, auth_enabled: bool = False):
+def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
     """Create and configure Flask application."""
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.urandom(24)
@@ -56,7 +57,7 @@ def create_app(library_path: str, auth_enabled: bool = False):
         """Artists page."""
         # Get unique artists from albums
         albums_list = app.db.get_albums()
-        artists_dict = {}
+        artists_dict: Dict[str, List[Dict[str, Any]]] = {}
         
         for album in albums_list:
             artist = album['artist'] or 'Unknown Artist'
@@ -75,7 +76,7 @@ def create_app(library_path: str, auth_enabled: bool = False):
     def search() -> str:
         """Search page."""
         query = request.args.get('q', '').strip()
-        results = {'albums': [], 'tracks': []}
+        results: Dict[str, List[Dict[str, Any]]] = {'albums': [], 'tracks': []}
         
         if query:
             results['albums'] = app.db.search_albums(query)
@@ -87,7 +88,8 @@ def create_app(library_path: str, auth_enabled: bool = False):
     def api_scan() -> Response:
         """Trigger library scan."""
         if app.scanner.scanning:
-            return jsonify({'status': 'already_scanning'})
+            response = jsonify({'status': 'already_scanning'})
+            return response
         
         # Start scan in background
         def scan_thread() -> None:
@@ -95,12 +97,14 @@ def create_app(library_path: str, auth_enabled: bool = False):
             print(f"Scan completed: {stats}")
         
         threading.Thread(target=scan_thread, daemon=True).start()
-        return jsonify({'status': 'scan_started'})
+        response = jsonify({'status': 'scan_started'})
+        return response
     
     @app.route('/api/scan/status')
     def api_scan_status() -> Response:
         """Get scan status."""
-        return jsonify({'scanning': app.scanner.scanning})
+        response = jsonify({'scanning': app.scanner.scanning})
+        return response
     
     @app.route('/stream/<int:track_id>')
     def stream_track(track_id: int) -> Response:
@@ -120,7 +124,8 @@ def create_app(library_path: str, auth_enabled: bool = False):
         app.db.increment_play_count(track_id)
         
         # For now, serve file directly (transcoding will be added later)
-        return send_file(track_path, as_attachment=False)
+        response = send_file(track_path, as_attachment=False)
+        return response
     
     @app.route('/art/<int:album_id>')
     def album_art(album_id: int) -> Response:
@@ -132,7 +137,8 @@ def create_app(library_path: str, auth_enabled: bool = False):
             art_path = Path(album['art_path'])
             assert art_path.exists(), f"Art file not found: {art_path}"
             
-            return send_file(art_path)
+            response = send_file(art_path)
+            return response
         except AssertionError:
             abort(404)
     

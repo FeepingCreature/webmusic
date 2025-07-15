@@ -179,8 +179,10 @@ class MusicScanner:
     
     def scan_library_background(self, interval: int = 300) -> threading.Thread:
         """Run library scan in background thread."""
-        def scan_loop():
-            while not self._stop_scan:
+        def scan_loop() -> None:
+            while True:
+                if self._stop_scan:
+                    break
                 print("Starting background library scan...")
                 stats = self.scan_library()
                 print(f"Scan complete: {stats}")

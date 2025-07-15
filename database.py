@@ -89,6 +89,7 @@ class Database:
                 (path, name, artist, last_modified, date_added, art_path)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (path, name, artist, last_modified, now, art_path))
+            assert cursor.lastrowid is not None
             return cursor.lastrowid
     
     def add_track(self, album_id: int, path: str, title: str, 
@@ -104,6 +105,7 @@ class Database:
             """, (album_id, path, title, artist, duration, track_number, cue_start, cue_end))
             
             # Initialize stats for new track
+            assert cursor.lastrowid is not None
             track_id = cursor.lastrowid
             now = datetime.now().timestamp()
             conn.execute("""
@@ -185,4 +187,4 @@ class Database:
             if not row:
                 return True  # New album
             
-            return row['last_modified'] < last_modified
+            return bool(row['last_modified'] < last_modified)
