@@ -161,7 +161,7 @@ class MusicScanner:
         stats = {'albums_scanned': 0, 'albums_updated': 0, 'errors': 0}
         
         try:
-            for root, dirs, files in os.walk(self.library_path):
+            for root, dirs, files in os.walk(self.library_path, followlinks=True):
                 if self._stop_scan:
                     break
                 
