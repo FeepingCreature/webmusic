@@ -19,7 +19,7 @@
         <div class="artist-albums">
             {% for album in artist.albums %}
             <div class="artist-album">
-                <a href="{{ url_for('album_detail', album_id=album.id) }}">
+                <a href="{{ url_for_with_base('album_detail', album_id=album.id) }}">
                     {{ album.name }}
                 </a>
             </div>

@@ -14,9 +14,9 @@
 <div class="albums-grid" id="albums-container">
     {% for album in albums %}
     <div class="album-card">
-        <a href="{{ url_for('album_detail', album_id=album.id) }}">
+        <a href="{{ url_for_with_base('album_detail', album_id=album.id) }}">
             {% if album.art_path %}
-            <img src="{{ url_for('album_art', album_id=album.id) }}" 
+            <img src="{{ url_for_with_base('album_art', album_id=album.id) }}" 
                  alt="{{ album.name }}" class="album-art">
             {% else %}
             <div class="album-art-placeholder">♪</div>

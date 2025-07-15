@@ -15,15 +15,20 @@ from transcoder import AudioTranscoder
 
 def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '') -> Flask:
     """Create and configure Flask application."""
-    # Configure static URL path to include base path
-    base_path_clean = base_path.rstrip('/')
-    static_url_path = f"{base_path_clean}/static" if base_path_clean else None
-    
-    app = Flask(__name__, static_url_path=static_url_path)
+    app = Flask(__name__)
     app.config['SECRET_KEY'] = os.urandom(24)
     
     # Configure base path for reverse proxy support
+    base_path_clean = base_path.rstrip('/')
     app.config['BASE_PATH'] = base_path_clean
+    
+    # Custom template function to generate URLs with base path
+    @app.template_global()
+    def url_for_with_base(endpoint, **values):
+        url = app.url_for(endpoint, **values)
+        if base_path_clean and url.startswith('/'):
+            url = base_path_clean + url
+        return url
     
     # Initialize database, scanner, and transcoder
     db = Database()
