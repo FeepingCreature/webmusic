@@ -24,7 +24,9 @@ class WebMusicPlayer {
         this.albumContext = null;
         this.currentTrackIndex = -1;
         this.currentTrackId = null;
+        this.currentTrackDuration = 0;
         this.seeking = false;
+        this.seekOffset = 0;
         
         this.setupEventListeners();
         this.setupLinkHijacking();
@@ -329,29 +331,41 @@ class WebMusicPlayer {
     playTrack(trackId, title, artist, albumContext = null) {
         const basePath = window.BASE_PATH || '';
         this.currentTrackId = trackId;
+        this.seekOffset = 0; // Reset seek offset for new track
         this.audio.src = `${basePath}/stream/${trackId}`;
         this.audio.play();
         this.currentTrackElement.textContent = `${artist} - ${title}`;
         
+        // Set track duration from metadata
         if (albumContext) {
+            const track = albumContext.tracks.find(t => t.id === trackId);
+            this.currentTrackDuration = track ? track.duration : 0;
             this.setAlbumContext(albumContext, trackId);
         } else {
+            // For single tracks, we'll use the audio element duration as fallback
+            this.currentTrackDuration = 0;
             this.clearAlbumMode();
         }
+        
+        this.updateDuration();
     }
     
     updateProgressBar() {
-        if (this.audio.duration && !isNaN(this.audio.duration)) {
-            const progress = (this.audio.currentTime / this.audio.duration) * 100;
+        const duration = this.currentTrackDuration || this.audio.duration || 0;
+        if (duration > 0) {
+            // Calculate actual current time in the original track
+            const actualCurrentTime = this.seekOffset + (this.audio.currentTime || 0);
+            const progress = (actualCurrentTime / duration) * 100;
             this.progressBar.style.width = `${progress}%`;
             this.progressHandle.style.left = `${progress}%`;
-            this.currentTimeElement.textContent = this.formatTime(this.audio.currentTime);
+            this.currentTimeElement.textContent = this.formatTime(actualCurrentTime);
         }
     }
     
     updateDuration() {
-        if (this.audio.duration && !isNaN(this.audio.duration)) {
-            this.durationElement.textContent = this.formatTime(this.audio.duration);
+        const duration = this.currentTrackDuration || this.audio.duration || 0;
+        if (duration > 0) {
+            this.durationElement.textContent = this.formatTime(duration);
         }
     }
     
@@ -363,12 +377,13 @@ class WebMusicPlayer {
     }
     
     handleSeek(e) {
-        if (!this.audio.duration || !this.currentTrackId) return;
+        const duration = this.currentTrackDuration || this.audio.duration || 0;
+        if (!duration || !this.currentTrackId) return;
         
         const rect = this.progressContainer.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const progress = Math.max(0, Math.min(1, clickX / rect.width));
-        const seekTime = progress * this.audio.duration;
+        const seekTime = progress * duration;
         
         // Update UI immediately for responsiveness
         this.progressBar.style.width = `${progress * 100}%`;
@@ -382,6 +397,9 @@ class WebMusicPlayer {
     seekToPosition(seekTime) {
         const basePath = window.BASE_PATH || '';
         const seekUrl = `${basePath}/stream/${this.currentTrackId}?seek=${seekTime}`;
+        
+        // Store the seek offset for progress calculations
+        this.seekOffset = seekTime;
         
         // Replace current audio source with seek URL
         this.audio.src = seekUrl;
