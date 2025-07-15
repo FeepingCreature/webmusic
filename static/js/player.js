@@ -140,16 +140,44 @@ class WebMusicPlayer {
             });
         });
         
-        // Re-attach form submission handlers
-        const searchForm = document.querySelector('.search-form');
-        if (searchForm) {
-            searchForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const formData = new FormData(searchForm);
-                const query = formData.get('q');
-                const url = `/search?q=${encodeURIComponent(query)}`;
-                this.loadPage(url);
-                history.pushState(null, '', url);
+        // Re-attach filter input handlers
+        const albumFilter = document.getElementById('album-filter');
+        if (albumFilter) {
+            albumFilter.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                const albumCards = document.querySelectorAll('.album-card');
+                
+                albumCards.forEach(card => {
+                    const title = card.querySelector('.album-title').textContent.toLowerCase();
+                    const artist = card.querySelector('.album-artist').textContent.toLowerCase();
+                    
+                    if (title.includes(query) || artist.includes(query)) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        }
+        
+        const artistFilter = document.getElementById('artist-filter');
+        if (artistFilter) {
+            artistFilter.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                const artistItems = document.querySelectorAll('.artist-item');
+                
+                artistItems.forEach(item => {
+                    const artistName = item.querySelector('.artist-name').textContent.toLowerCase();
+                    const albumNames = Array.from(item.querySelectorAll('.artist-album a'))
+                        .map(link => link.textContent.toLowerCase())
+                        .join(' ');
+                    
+                    if (artistName.includes(query) || albumNames.includes(query)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
             });
         }
     }

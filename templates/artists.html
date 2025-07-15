@@ -5,9 +5,12 @@
 {% block content %}
 <div class="page-header">
     <h1>Artists</h1>
+    <div class="page-actions">
+        <input type="text" id="artist-filter" placeholder="Filter artists..." class="filter-input">
+    </div>
 </div>
 
-<div class="artists-list">
+<div class="artists-list" id="artists-container">
     {% for artist in artists %}
     <div class="artist-item">
         <h3 class="artist-name">{{ artist.name }}</h3>
@@ -31,4 +34,30 @@
     <p>No artists found.</p>
 </div>
 {% endif %}
+
+<script>
+// Artist filtering
+document.addEventListener('DOMContentLoaded', function() {
+    const filterInput = document.getElementById('artist-filter');
+    const artistsContainer = document.getElementById('artists-container');
+    const artistItems = artistsContainer.querySelectorAll('.artist-item');
+    
+    filterInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        
+        artistItems.forEach(item => {
+            const artistName = item.querySelector('.artist-name').textContent.toLowerCase();
+            const albumNames = Array.from(item.querySelectorAll('.artist-album a'))
+                .map(link => link.textContent.toLowerCase())
+                .join(' ');
+            
+            if (artistName.includes(query) || albumNames.includes(query)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

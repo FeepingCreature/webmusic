@@ -6,11 +6,12 @@
 <div class="page-header">
     <h1>Albums</h1>
     <div class="page-actions">
+        <input type="text" id="album-filter" placeholder="Filter albums..." class="filter-input">
         <button onclick="triggerScan()">Scan Library</button>
     </div>
 </div>
 
-<div class="albums-grid">
+<div class="albums-grid" id="albums-container">
     {% for album in albums %}
     <div class="album-card">
         <a href="{{ url_for('album_detail', album_id=album.id) }}">
@@ -47,5 +48,27 @@ function triggerScan() {
             }
         });
 }
+
+// Album filtering
+document.addEventListener('DOMContentLoaded', function() {
+    const filterInput = document.getElementById('album-filter');
+    const albumsContainer = document.getElementById('albums-container');
+    const albumCards = albumsContainer.querySelectorAll('.album-card');
+    
+    filterInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        
+        albumCards.forEach(card => {
+            const title = card.querySelector('.album-title').textContent.toLowerCase();
+            const artist = card.querySelector('.album-artist').textContent.toLowerCase();
+            
+            if (title.includes(query) || artist.includes(query)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+});
 </script>
 {% endblock %}

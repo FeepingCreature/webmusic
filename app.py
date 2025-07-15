@@ -35,12 +35,8 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
     @app.route('/albums')
     def albums() -> str:
         """Albums page."""
-        page = request.args.get('page', 1, type=int)
-        limit = 50
-        offset = (page - 1) * limit
-        
-        albums_list = app.db.get_albums(limit=limit, offset=offset)
-        return render_template('albums.html', albums=albums_list, page=page)
+        albums_list = app.db.get_albums()
+        return render_template('albums.html', albums=albums_list)
     
     @app.route('/album/<int:album_id>')
     def album_detail(album_id: int) -> str:
@@ -72,17 +68,6 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
         
         return render_template('artists.html', artists=artists_list)
     
-    @app.route('/search')
-    def search() -> str:
-        """Search page."""
-        query = request.args.get('q', '').strip()
-        results: Dict[str, List[Dict[str, Any]]] = {'albums': [], 'tracks': []}
-        
-        if query:
-            results['albums'] = app.db.search_albums(query)
-            results['tracks'] = app.db.search_tracks(query)
-        
-        return render_template('search.html', query=query, results=results)
     
     @app.route('/api/scan')
     def api_scan() -> Response:

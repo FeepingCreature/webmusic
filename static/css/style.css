@@ -89,6 +89,7 @@ body {
     padding: 2rem;
     overflow-y: auto;
     transition: opacity 0.2s ease;
+    height: calc(100vh - 80px);
 }
 
 /* Page Headers */
@@ -102,6 +103,20 @@ body {
 .page-header h1 {
     font-size: 2rem;
     color: #2c3e50;
+}
+
+.page-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.filter-input {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    min-width: 200px;
 }
 
 .page-actions button {
