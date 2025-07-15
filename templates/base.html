@@ -42,6 +42,10 @@
     
     <audio id="audio-player" preload="none"></audio>
     
+    <script>
+        // Pass base path to JavaScript
+        window.BASE_PATH = '{{ config.BASE_PATH }}';
+    </script>
     <script src="{{ url_for('static', filename='js/player.js') }}"></script>
 </body>
 </html>

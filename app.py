@@ -13,10 +13,15 @@ from scanner import MusicScanner
 from transcoder import AudioTranscoder
 
 
-def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
+def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '') -> Flask:
     """Create and configure Flask application."""
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.urandom(24)
+    
+    # Configure base path for reverse proxy support
+    if base_path:
+        app.config['APPLICATION_ROOT'] = base_path.rstrip('/')
+    app.config['BASE_PATH'] = base_path.rstrip('/')
     
     # Initialize database, scanner, and transcoder
     db = Database()
@@ -184,6 +189,8 @@ def main() -> None:
                        default='disabled', help='Authentication mode')
     parser.add_argument('--scan-interval', type=int, default=300, 
                        help='Background scan interval in seconds')
+    parser.add_argument('--base-path', default='', 
+                       help='Base path for reverse proxy (e.g., /webmusic)')
     
     args = parser.parse_args()
     
@@ -191,7 +198,7 @@ def main() -> None:
     
     # Create Flask app
     auth_enabled = args.auth in ['required', 'optional']
-    app = create_app(args.library, auth_enabled)
+    app = create_app(args.library, auth_enabled, args.base_path)
     
     # Start background scanner
     if args.scan_interval > 0:

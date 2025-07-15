@@ -99,7 +99,11 @@ class WebMusicPlayer {
             // Add loading indicator
             this.contentElement.style.opacity = '0.5';
             
-            const response = await fetch(url, {
+            // Prepend base path if it exists and URL is relative
+            const basePath = window.BASE_PATH || '';
+            const fullUrl = url.startsWith('/') && basePath ? basePath + url : url;
+            
+            const response = await fetch(fullUrl, {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest'
                 }
@@ -224,7 +228,8 @@ class WebMusicPlayer {
     }
     
     playTrack(trackId, title, artist, albumContext = null) {
-        this.audio.src = `/stream/${trackId}`;
+        const basePath = window.BASE_PATH || '';
+        this.audio.src = `${basePath}/stream/${trackId}`;
         this.audio.play();
         this.currentTrackElement.textContent = `${artist} - ${title}`;
         
@@ -253,7 +258,8 @@ class WebMusicPlayer {
         
         // Show album art if available
         if (albumContext.album.art_path) {
-            this.albumArtImg.src = `/art/${albumContext.album.id}`;
+            const basePath = window.BASE_PATH || '';
+            this.albumArtImg.src = `${basePath}/art/${albumContext.album.id}`;
             this.albumArtMini.classList.remove('hidden');
             this.musicIcon.classList.add('hidden');
         }
