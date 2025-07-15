@@ -2,8 +2,12 @@
 
 import sqlite3
 import os
+import time
+import random
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Callable, TypeVar
+
+T = TypeVar('T')
 
 
 class Database:
@@ -12,6 +16,25 @@ class Database:
     def __init__(self, db_path: str = "webmusic.db"):
         self.db_path = db_path
         self.init_db()
+    
+    def _retry_on_lock(self, func: Callable[[], T], max_retries: int = 5) -> T:
+        """Retry a database operation if it fails due to database lock."""
+        for attempt in range(max_retries):
+            try:
+                return func()
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e).lower() and attempt < max_retries - 1:
+                    # Exponential backoff with jitter
+                    delay = (2 ** attempt) * 0.1 + random.uniform(0, 0.1)
+                    print(f"Database locked, retrying in {delay:.2f}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(delay)
+                    continue
+                else:
+                    # Re-raise if not a lock error or we've exhausted retries
+                    raise
+        
+        # This should never be reached, but just in case
+        raise RuntimeError(f"Failed to execute database operation after {max_retries} attempts")
     
     def get_connection(self) -> sqlite3.Connection:
         """Get a database connection with row factory."""
@@ -83,97 +106,103 @@ class Database:
                   art_path: bytes | None = None, update_timestamp: bool = True, 
                   clear_tracks: bool = False) -> int:
         """Add or update an album in the database."""
-        now = datetime.now().timestamp()
-        
-        with self.get_connection() as conn:
-            # Check if album already exists
-            existing = conn.execute("SELECT id, last_modified FROM albums WHERE path = ?", (path,)).fetchone()
+        def _add_album_impl() -> int:
+            now = datetime.now().timestamp()
             
-            if existing:
-                album_id = existing['id']
+            with self.get_connection() as conn:
+                # Check if album already exists
+                existing = conn.execute("SELECT id, last_modified FROM albums WHERE path = ?", (path,)).fetchone()
                 
-                # Clear existing tracks if requested (for rescanning)
-                if clear_tracks:
-                    conn.execute("DELETE FROM tracks WHERE album_id = ?", (album_id,))
-                
-                # Update existing album
-                if update_timestamp and last_modified is None:
-                    last_modified = os.path.getmtime(path)
-                elif not update_timestamp:
-                    # Keep existing timestamp
-                    last_modified = existing['last_modified']
-                elif last_modified is None:
-                    last_modified = existing['last_modified']
-                
-                conn.execute("""
-                    UPDATE albums 
-                    SET name = ?, artist = ?, albumartist = ?, last_modified = ?, art_path = ?
-                    WHERE id = ?
-                """, (name, artist, albumartist, last_modified, art_path, album_id))
-                return album_id
-            else:
-                # Create new album
-                if last_modified is None:
-                    last_modified = 0 if not update_timestamp else os.path.getmtime(path)
-                
-                cursor = conn.execute("""
-                    INSERT INTO albums 
-                    (path, name, artist, albumartist, last_modified, date_added, art_path)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (path, name, artist, albumartist, last_modified, now, art_path))
-                assert cursor.lastrowid is not None
-                return cursor.lastrowid
+                if existing:
+                    album_id = existing['id']
+                    
+                    # Clear existing tracks if requested (for rescanning)
+                    if clear_tracks:
+                        conn.execute("DELETE FROM tracks WHERE album_id = ?", (album_id,))
+                    
+                    # Update existing album
+                    if update_timestamp and last_modified is None:
+                        last_modified = os.path.getmtime(path)
+                    elif not update_timestamp:
+                        # Keep existing timestamp
+                        last_modified = existing['last_modified']
+                    elif last_modified is None:
+                        last_modified = existing['last_modified']
+                    
+                    conn.execute("""
+                        UPDATE albums 
+                        SET name = ?, artist = ?, albumartist = ?, last_modified = ?, art_path = ?
+                        WHERE id = ?
+                    """, (name, artist, albumartist, last_modified, art_path, album_id))
+                    return album_id
+                else:
+                    # Create new album
+                    if last_modified is None:
+                        last_modified = 0 if not update_timestamp else os.path.getmtime(path)
+                    
+                    cursor = conn.execute("""
+                        INSERT INTO albums 
+                        (path, name, artist, albumartist, last_modified, date_added, art_path)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (path, name, artist, albumartist, last_modified, now, art_path))
+                    assert cursor.lastrowid is not None
+                    return cursor.lastrowid
+        
+        return self._retry_on_lock(_add_album_impl)
     
     def add_track(self, album_id: int, path: bytes, title: str, 
                   artist: str | None = None, duration: float | None = None,
                   track_number: int | None = None, cue_start: float | None = None,
                   cue_end: float | None = None) -> int:
         """Add or update a track in the database."""
-        with self.get_connection() as conn:
-            # For CUE tracks, we need to handle the case where multiple tracks
-            # have the same file path but different cue_start times
-            if cue_start is not None:
-                # Check if this exact CUE track already exists
-                existing = conn.execute("""
-                    SELECT id FROM tracks 
-                    WHERE album_id = ? AND path = ? AND cue_start = ?
-                """, (album_id, path, cue_start)).fetchone()
-                
-                if existing:
-                    # Update existing CUE track
-                    track_id = existing['id']
-                    conn.execute("""
-                        UPDATE tracks 
-                        SET title = ?, artist = ?, duration = ?, track_number = ?, cue_end = ?
-                        WHERE id = ?
-                    """, (title, artist, duration, track_number, cue_end, track_id))
+        def _add_track_impl() -> int:
+            with self.get_connection() as conn:
+                # For CUE tracks, we need to handle the case where multiple tracks
+                # have the same file path but different cue_start times
+                if cue_start is not None:
+                    # Check if this exact CUE track already exists
+                    existing = conn.execute("""
+                        SELECT id FROM tracks 
+                        WHERE album_id = ? AND path = ? AND cue_start = ?
+                    """, (album_id, path, cue_start)).fetchone()
+                    
+                    if existing:
+                        # Update existing CUE track
+                        track_id = existing['id']
+                        conn.execute("""
+                            UPDATE tracks 
+                            SET title = ?, artist = ?, duration = ?, track_number = ?, cue_end = ?
+                            WHERE id = ?
+                        """, (title, artist, duration, track_number, cue_end, track_id))
+                    else:
+                        # Insert new CUE track
+                        cursor = conn.execute("""
+                            INSERT INTO tracks 
+                            (album_id, path, title, artist, duration, track_number, cue_start, cue_end)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (album_id, path, title, artist, duration, track_number, cue_start, cue_end))
+                        assert cursor.lastrowid is not None
+                        track_id = cursor.lastrowid
                 else:
-                    # Insert new CUE track
+                    # Regular track - use INSERT OR REPLACE
                     cursor = conn.execute("""
-                        INSERT INTO tracks 
+                        INSERT OR REPLACE INTO tracks 
                         (album_id, path, title, artist, duration, track_number, cue_start, cue_end)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """, (album_id, path, title, artist, duration, track_number, cue_start, cue_end))
                     assert cursor.lastrowid is not None
                     track_id = cursor.lastrowid
-            else:
-                # Regular track - use INSERT OR REPLACE
-                cursor = conn.execute("""
-                    INSERT OR REPLACE INTO tracks 
-                    (album_id, path, title, artist, duration, track_number, cue_start, cue_end)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (album_id, path, title, artist, duration, track_number, cue_start, cue_end))
-                assert cursor.lastrowid is not None
-                track_id = cursor.lastrowid
-            
-            # Initialize stats for new track
-            now = datetime.now().timestamp()
-            conn.execute("""
-                INSERT OR IGNORE INTO stats (track_id, date_added)
-                VALUES (?, ?)
-            """, (track_id, now))
-            
-            return track_id
+                
+                # Initialize stats for new track
+                now = datetime.now().timestamp()
+                conn.execute("""
+                    INSERT OR IGNORE INTO stats (track_id, date_added)
+                    VALUES (?, ?)
+                """, (track_id, now))
+                
+                return track_id
+        
+        return self._retry_on_lock(_add_track_impl)
     
     def get_albums(self, limit: int | None = None, offset: int = 0) -> List[Dict[str, Any]]:
         """Get all albums with optional pagination."""
@@ -251,7 +280,10 @@ class Database:
     
     def update_album_timestamp(self, path: bytes, last_modified: float) -> None:
         """Update an album's last_modified timestamp after successful scan."""
-        with self.get_connection() as conn:
-            conn.execute("""
-                UPDATE albums SET last_modified = ? WHERE path = ?
-            """, (last_modified, path))
+        def _update_timestamp_impl() -> None:
+            with self.get_connection() as conn:
+                conn.execute("""
+                    UPDATE albums SET last_modified = ? WHERE path = ?
+                """, (last_modified, path))
+        
+        self._retry_on_lock(_update_timestamp_impl)
