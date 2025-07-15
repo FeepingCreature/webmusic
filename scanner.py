@@ -158,7 +158,7 @@ class MusicScanner:
         
         self.scanning = True
         self._stop_scan = False
-        stats = {'albums_scanned': 0, 'albums_updated': 0, 'errors': 0}
+        stats = {'albums_scanned': 0, 'albums_updated': 0}
         
         try:
             for root, dirs, files in os.walk(self.library_path, followlinks=True):
@@ -174,13 +174,9 @@ class MusicScanner:
                 )
                 
                 if has_audio:
-                    try:
-                        if self.scan_album(root_path):
-                            stats['albums_updated'] += 1
-                        stats['albums_scanned'] += 1
-                    except Exception as e:
-                        print(f"Error scanning {root}: {e}")
-                        stats['errors'] += 1
+                    if self.scan_album(root_path):
+                        stats['albums_updated'] += 1
+                    stats['albums_scanned'] += 1
         
         finally:
             self.scanning = False
