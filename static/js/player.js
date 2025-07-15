@@ -102,7 +102,24 @@ class WebMusicPlayer {
         
         // Handle browser back/forward buttons
         window.addEventListener('popstate', () => {
-            this.loadPage(location.pathname);
+            const basePath = window.BASE_PATH || '';
+            const currentPath = location.pathname;
+            
+            // Check if this is an internal URL (starts with base path or is relative)
+            const isInternalUrl = currentPath.startsWith('/') || (basePath && currentPath.startsWith(basePath));
+            
+            if (isInternalUrl) {
+                // Strip base path from URL for internal routing
+                let internalPath = currentPath;
+                if (basePath && currentPath.startsWith(basePath)) {
+                    internalPath = currentPath.substring(basePath.length) || '/';
+                }
+                
+                this.loadPage(internalPath);
+            } else {
+                // External URL - do full page reload
+                location.reload();
+            }
         });
     }
     
