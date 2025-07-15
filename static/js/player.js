@@ -239,6 +239,14 @@ class WebMusicPlayer {
         this.albumContext = albumContext;
         this.currentTrackIndex = albumContext.tracks.findIndex(track => track.id === currentTrackId);
         
+        // Update track display to include track number
+        if (this.currentTrackIndex >= 0) {
+            const currentTrack = albumContext.tracks[this.currentTrackIndex];
+            const trackNumber = currentTrack.track_number || (this.currentTrackIndex + 1);
+            const artist = currentTrack.artist || albumContext.album.artist || 'Unknown Artist';
+            this.currentTrackElement.textContent = `${trackNumber}. ${artist} - ${currentTrack.title}`;
+        }
+        
         // Show album info in header
         this.currentAlbumElement.textContent = `${albumContext.album.artist || 'Unknown Artist'} - ${albumContext.album.name}`;
         this.currentAlbumElement.classList.remove('hidden');
