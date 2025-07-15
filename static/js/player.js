@@ -306,8 +306,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Global function for playing tracks (used by templates)
-function playTrack(trackId, title, artist, albumContext = null) {
-    if (window.player) {
-        window.player.playTrack(trackId, title, artist, albumContext);
-    }
+// Only define if not already defined (album pages may override this)
+if (typeof window.playTrack === 'undefined') {
+    window.playTrack = function(trackId, title, artist, albumContext = null) {
+        if (window.player) {
+            window.player.playTrack(trackId, title, artist, albumContext);
+        }
+    };
 }
