@@ -23,7 +23,7 @@
             {% endif %}
             <div class="album-info">
                 <h3 class="album-title">{{ album.name }}</h3>
-                <p class="album-artist">{{ album.artist or 'Unknown Artist' }}</p>
+                <p class="album-artist">{{ album.albumartist or album.artist or 'Unknown Artist' }}</p>
             </div>
         </a>
     </div>

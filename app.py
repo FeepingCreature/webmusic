@@ -101,12 +101,13 @@ def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '
     @app.route('/artists')
     def artists() -> str:
         """Artists page."""
-        # Get unique artists from albums
+        # Get unique artists from albums (prefer albumartist over artist)
         albums_list = app.db.get_albums()
         artists_dict: Dict[str, List[Dict[str, Any]]] = {}
         
         for album in albums_list:
-            artist = album['artist'] or 'Unknown Artist'
+            # Use albumartist if available, otherwise fall back to artist
+            artist = album['albumartist'] or album['artist'] or 'Unknown Artist'
             if artist not in artists_dict:
                 artists_dict[artist] = []
             artists_dict[artist].append(album)

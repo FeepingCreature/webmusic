@@ -59,6 +59,7 @@ class MusicScanner:
             'title': self._get_tag(audio_file, ['TIT2', 'TITLE', '\xa9nam']),
             'artist': self._get_tag(audio_file, ['TPE1', 'ARTIST', '\xa9ART']),
             'album': self._get_tag(audio_file, ['TALB', 'ALBUM', '\xa9alb']),
+            'albumartist': self._get_tag(audio_file, ['TPE2', 'ALBUMARTIST', 'aART']),
             'track_number': self._get_track_number(audio_file),
             'duration': getattr(audio_file.info, 'length', 0)
         }
@@ -161,6 +162,7 @@ class MusicScanner:
         first_file_meta = self.extract_metadata(audio_files[0])
         album_name = first_file_meta.get('album') or album_path.name
         album_artist = first_file_meta.get('artist')
+        album_albumartist = first_file_meta.get('albumartist')
         
         # Find album art
         art_path = self.find_album_art(album_path)
@@ -171,6 +173,7 @@ class MusicScanner:
             path=album_path_bytes,
             name=album_name,
             artist=album_artist,
+            albumartist=album_albumartist,
             art_path=art_path_bytes,
             update_timestamp=False,
             clear_tracks=True
@@ -232,6 +235,7 @@ class MusicScanner:
             path=album_path_bytes,
             name=album_name,
             artist=album_artist,
+            albumartist=album_artist,  # For CUE albums, album artist is the performer
             art_path=art_path_bytes,
             update_timestamp=False,
             clear_tracks=True

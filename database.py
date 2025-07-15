@@ -28,6 +28,7 @@ class Database:
                     path TEXT UNIQUE NOT NULL,
                     name TEXT NOT NULL,
                     artist TEXT,
+                    albumartist TEXT,
                     last_modified REAL NOT NULL,
                     date_added REAL NOT NULL,
                     art_path TEXT
@@ -78,8 +79,9 @@ class Database:
             """)
     
     def add_album(self, path: bytes, name: str, artist: str | None = None, 
-                  last_modified: float | None = None, art_path: bytes | None = None,
-                  update_timestamp: bool = True, clear_tracks: bool = False) -> int:
+                  albumartist: str | None = None, last_modified: float | None = None, 
+                  art_path: bytes | None = None, update_timestamp: bool = True, 
+                  clear_tracks: bool = False) -> int:
         """Add or update an album in the database."""
         now = datetime.now().timestamp()
         
@@ -105,9 +107,9 @@ class Database:
                 
                 conn.execute("""
                     UPDATE albums 
-                    SET name = ?, artist = ?, last_modified = ?, art_path = ?
+                    SET name = ?, artist = ?, albumartist = ?, last_modified = ?, art_path = ?
                     WHERE id = ?
-                """, (name, artist, last_modified, art_path, album_id))
+                """, (name, artist, albumartist, last_modified, art_path, album_id))
                 return album_id
             else:
                 # Create new album
@@ -116,9 +118,9 @@ class Database:
                 
                 cursor = conn.execute("""
                     INSERT INTO albums 
-                    (path, name, artist, last_modified, date_added, art_path)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (path, name, artist, last_modified, now, art_path))
+                    (path, name, artist, albumartist, last_modified, date_added, art_path)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (path, name, artist, albumartist, last_modified, now, art_path))
                 assert cursor.lastrowid is not None
                 return cursor.lastrowid
     

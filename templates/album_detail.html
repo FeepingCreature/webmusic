@@ -13,7 +13,7 @@
     
     <div class="album-details">
         <h1>{{ album.name }}</h1>
-        <h2>{{ album.artist or 'Unknown Artist' }}</h2>
+        <h2>{{ album.albumartist or album.artist or 'Unknown Artist' }}</h2>
         <p>{{ tracks|length }} track{{ 's' if tracks|length != 1 else '' }}</p>
     </div>
 </div>
