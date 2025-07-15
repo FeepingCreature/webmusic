@@ -121,30 +121,32 @@ class Database:
                         conn.execute("DELETE FROM tracks WHERE album_id = ?", (album_id,))
                     
                     # Update existing album
-                    if update_timestamp and last_modified is None:
-                        last_modified = os.path.getmtime(path)
+                    final_last_modified = last_modified
+                    if update_timestamp and final_last_modified is None:
+                        final_last_modified = os.path.getmtime(path)
                     elif not update_timestamp:
                         # Keep existing timestamp
-                        last_modified = existing['last_modified']
-                    elif last_modified is None:
-                        last_modified = existing['last_modified']
+                        final_last_modified = existing['last_modified']
+                    elif final_last_modified is None:
+                        final_last_modified = existing['last_modified']
                     
                     conn.execute("""
                         UPDATE albums 
                         SET name = ?, artist = ?, albumartist = ?, last_modified = ?, art_path = ?
                         WHERE id = ?
-                    """, (name, artist, albumartist, last_modified, art_path, album_id))
+                    """, (name, artist, albumartist, final_last_modified, art_path, album_id))
                     return album_id
                 else:
                     # Create new album
-                    if last_modified is None:
-                        last_modified = 0 if not update_timestamp else os.path.getmtime(path)
+                    final_last_modified = last_modified
+                    if final_last_modified is None:
+                        final_last_modified = 0 if not update_timestamp else os.path.getmtime(path)
                     
                     cursor = conn.execute("""
                         INSERT INTO albums 
                         (path, name, artist, albumartist, last_modified, date_added, art_path)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (path, name, artist, albumartist, last_modified, now, art_path))
+                    """, (path, name, artist, albumartist, final_last_modified, now, art_path))
                     assert cursor.lastrowid is not None
                     return cursor.lastrowid
         
