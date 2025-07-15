@@ -5,6 +5,7 @@ import threading
 import time
 from pathlib import Path
 from typing import List, Dict, Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import mutagen
 
 from database import Database
@@ -69,12 +70,16 @@ class MusicScanner:
     def _get_tag(self, audio_file: mutagen.FileType, tag_names: List[str]) -> str | None:
         """Get tag value from audio file, trying multiple tag formats."""
         for tag_name in tag_names:
-            if tag_name in audio_file:
-                value = audio_file[tag_name]
-                if isinstance(value, list) and value:
-                    return str(value[0])
-                elif value:
-                    return str(value)
+            try:
+                if tag_name in audio_file:
+                    value = audio_file[tag_name]
+                    if isinstance(value, list) and value:
+                        return str(value[0])
+                    elif value:
+                        return str(value)
+            except (ValueError, KeyError):
+                # Some audio files raise ValueError when checking tag existence
+                continue
         return None
     
     def _get_track_number(self, audio_file: mutagen.FileType) -> int | None:
@@ -116,23 +121,16 @@ class MusicScanner:
                 audio_files.append(file)
         
         if not audio_files:
-            print(f"  → No audio files found in {album_path.name}")
             return False
-        
-        print(f"  → Found {len(audio_files)} audio files")
         
         # Extract album metadata from first audio file
         first_file_meta = self.extract_metadata(audio_files[0])
         album_name = first_file_meta.get('album') or album_path.name
         album_artist = first_file_meta.get('artist')
         
-        print(f"  → Album: {album_name} by {album_artist or 'Unknown Artist'}")
-        
         # Find album art
         art_path = self.find_album_art(album_path)
         art_path_bytes = os.fsencode(art_path) if art_path else None
-        if art_path:
-            print(f"  → Found album art: {Path(art_path).name}")
         
         # Add album to database
         album_id = self.db.add_album(
@@ -168,7 +166,8 @@ class MusicScanner:
         print(f"Starting library scan of: {self.library_path}")
         
         try:
-            # Use os.walk with bytes to handle non-UTF-8 filenames
+            # First pass: collect all album directories
+            album_dirs = []
             for root, dirs, files in os.walk(os.fsencode(self.library_path), followlinks=True):
                 if self._stop_event.is_set():
                     print("Scan stopped by user request")
@@ -183,17 +182,40 @@ class MusicScanner:
                 )
                 
                 if has_audio:
-                    print(f"Scanning album: {root_path.relative_to(self.library_path)}")
-                    if self.scan_album(root_path):
-                        stats['albums_updated'] += 1
-                        print(f"  → Updated album metadata")
-                    else:
-                        print(f"  → Album up to date")
-                    stats['albums_scanned'] += 1
+                    album_dirs.append(root_path)
+            
+            print(f"Found {len(album_dirs)} album directories")
+            
+            # Second pass: scan albums in parallel
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                # Submit all scan jobs
+                future_to_path = {
+                    executor.submit(self.scan_album, album_path): album_path 
+                    for album_path in album_dirs
+                }
+                
+                # Process completed scans
+                for future in as_completed(future_to_path):
+                    if self._stop_event.is_set():
+                        print("Scan stopped by user request")
+                        break
                     
-                    # Progress update every 10 albums
-                    if stats['albums_scanned'] % 10 == 0:
-                        print(f"Progress: {stats['albums_scanned']} albums scanned, {stats['albums_updated']} updated")
+                    album_path = future_to_path[future]
+                    try:
+                        was_updated = future.result()
+                        stats['albums_scanned'] += 1
+                        if was_updated:
+                            stats['albums_updated'] += 1
+                        
+                        print(f"Scanned album: {album_path.relative_to(self.library_path)} {'(updated)' if was_updated else '(up to date)'}")
+                        
+                        # Progress update every 10 albums
+                        if stats['albums_scanned'] % 10 == 0:
+                            print(f"Progress: {stats['albums_scanned']}/{len(album_dirs)} albums scanned, {stats['albums_updated']} updated")
+                    
+                    except Exception as e:
+                        print(f"Error scanning {album_path.relative_to(self.library_path)}: {e}")
+                        stats['albums_scanned'] += 1
         
         finally:
             self.scanning = False
