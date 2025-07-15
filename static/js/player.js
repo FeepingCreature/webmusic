@@ -119,16 +119,29 @@ class WebMusicPlayer {
             if (newContent) {
                 // Replace content
                 this.contentElement.innerHTML = newContent.innerHTML;
-                
+            
+                // Execute any scripts in the new content
+                const scripts = this.contentElement.querySelectorAll('script');
+                scripts.forEach(script => {
+                    const newScript = document.createElement('script');
+                    if (script.src) {
+                        newScript.src = script.src;
+                    } else {
+                        newScript.textContent = script.textContent;
+                    }
+                    document.head.appendChild(newScript);
+                    document.head.removeChild(newScript);
+                });
+            
                 // Update page title
                 const newTitle = doc.querySelector('title');
                 if (newTitle) {
                     document.title = newTitle.textContent;
                 }
-                
+            
                 // Update active nav link
                 this.updateActiveNavLink(url);
-                
+            
                 // Re-attach event listeners for new content
                 this.attachContentEventListeners();
             }
