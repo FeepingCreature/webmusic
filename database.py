@@ -78,21 +78,43 @@ class Database:
             """)
     
     def add_album(self, path: bytes, name: str, artist: str | None = None, 
-                  last_modified: float | None = None, art_path: bytes | None = None) -> int:
+                  last_modified: float | None = None, art_path: bytes | None = None,
+                  update_timestamp: bool = True) -> int:
         """Add or update an album in the database."""
-        if last_modified is None:
-            last_modified = os.path.getmtime(path)
-        
         now = datetime.now().timestamp()
         
         with self.get_connection() as conn:
-            cursor = conn.execute("""
-                INSERT OR REPLACE INTO albums 
-                (path, name, artist, last_modified, date_added, art_path)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (path, name, artist, last_modified, now, art_path))
-            assert cursor.lastrowid is not None
-            return cursor.lastrowid
+            # Check if album already exists
+            existing = conn.execute("SELECT id, last_modified FROM albums WHERE path = ?", (path,)).fetchone()
+            
+            if existing:
+                # Update existing album
+                if update_timestamp and last_modified is None:
+                    last_modified = os.path.getmtime(path)
+                elif not update_timestamp:
+                    # Keep existing timestamp
+                    last_modified = existing['last_modified']
+                elif last_modified is None:
+                    last_modified = existing['last_modified']
+                
+                conn.execute("""
+                    UPDATE albums 
+                    SET name = ?, artist = ?, last_modified = ?, art_path = ?
+                    WHERE id = ?
+                """, (name, artist, last_modified, art_path, existing['id']))
+                return existing['id']
+            else:
+                # Create new album
+                if last_modified is None:
+                    last_modified = 0 if not update_timestamp else os.path.getmtime(path)
+                
+                cursor = conn.execute("""
+                    INSERT INTO albums 
+                    (path, name, artist, last_modified, date_added, art_path)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (path, name, artist, last_modified, now, art_path))
+                assert cursor.lastrowid is not None
+                return cursor.lastrowid
     
     def add_track(self, album_id: int, path: bytes, title: str, 
                   artist: str | None = None, duration: float | None = None,
@@ -218,3 +240,10 @@ class Database:
                 return True  # New album
             
             return bool(row['last_modified'] < last_modified)
+    
+    def update_album_timestamp(self, path: bytes, last_modified: float) -> None:
+        """Update an album's last_modified timestamp after successful scan."""
+        with self.get_connection() as conn:
+            conn.execute("""
+                UPDATE albums SET last_modified = ? WHERE path = ?
+            """, (last_modified, path))

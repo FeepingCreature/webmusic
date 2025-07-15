@@ -149,13 +149,13 @@ class MusicScanner:
         art_path = self.find_album_art(album_path)
         art_path_bytes = os.fsencode(art_path) if art_path else None
         
-        # Add album to database
+        # Add album to database (without updating timestamp yet)
         album_id = self.db.add_album(
             path=album_path_bytes,
             name=album_name,
             artist=album_artist,
-            last_modified=last_modified,
-            art_path=art_path_bytes
+            art_path=art_path_bytes,
+            update_timestamp=False
         )
         
         # Add tracks
@@ -169,6 +169,9 @@ class MusicScanner:
                 duration=metadata['duration'],
                 track_number=metadata['track_number']
             )
+        
+        # Only update timestamp after successful completion
+        self.db.update_album_timestamp(album_path_bytes, last_modified)
         
         return True
     
@@ -206,13 +209,13 @@ class MusicScanner:
         if art_path:
             print(f"  → Found album art: {Path(art_path).name}")
         
-        # Add album to database
+        # Add album to database (without updating timestamp yet)
         album_id = self.db.add_album(
             path=album_path_bytes,
             name=album_name,
             artist=album_artist,
-            last_modified=last_modified,
-            art_path=art_path_bytes
+            art_path=art_path_bytes,
+            update_timestamp=False
         )
         
         # Add tracks from CUE
@@ -236,6 +239,9 @@ class MusicScanner:
             )
             
             print(f"  → Track added with ID: {track_id}")
+        
+        # Only update timestamp after successful completion
+        self.db.update_album_timestamp(album_path_bytes, last_modified)
         
         print(f"  → Successfully added {len(cue_sheet.tracks)} tracks")
         return True
