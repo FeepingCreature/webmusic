@@ -30,6 +30,7 @@ class WebMusicPlayer {
         
         this.setupEventListeners();
         this.setupLinkHijacking();
+        this.setupMediaSession();
     }
     
     setupEventListeners() {
@@ -45,10 +46,12 @@ class WebMusicPlayer {
         // Audio events
         this.audio.addEventListener('play', () => {
             this.playPauseButton.textContent = '⏸';
+            this.updateMediaSessionPlaybackState('playing');
         });
         
         this.audio.addEventListener('pause', () => {
             this.playPauseButton.textContent = '▶';
+            this.updateMediaSessionPlaybackState('paused');
         });
         
         this.audio.addEventListener('ended', () => {
@@ -363,6 +366,9 @@ class WebMusicPlayer {
         this.currentTrackDuration = track.duration || 0;
         this.setAlbumContext(albumContext, trackId);
         
+        // Update Media Session metadata
+        this.updateMediaSessionMetadata(title, artist, albumContext.album.name, albumContext.album.id);
+        
         this.updateDuration();
     }
     
@@ -375,6 +381,9 @@ class WebMusicPlayer {
             this.progressBar.style.width = `${progress}%`;
             this.progressHandle.style.left = `${progress}%`;
             this.currentTimeElement.textContent = this.formatTime(actualCurrentTime);
+            
+            // Update Media Session position state
+            this.updateMediaSessionPlaybackState('playing');
         }
     }
     
@@ -485,6 +494,86 @@ class WebMusicPlayer {
         
         const nextTrack = this.albumContext.tracks[this.currentTrackIndex + 1];
         this.playTrack(nextTrack.id);
+    }
+    
+    setupMediaSession() {
+        // Check if Media Session API is supported
+        if (!('mediaSession' in navigator)) {
+            console.log('Media Session API not supported');
+            return;
+        }
+        
+        // Set up action handlers
+        navigator.mediaSession.setActionHandler('play', () => {
+            this.audio.play();
+        });
+        
+        navigator.mediaSession.setActionHandler('pause', () => {
+            this.audio.pause();
+        });
+        
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+            this.playPreviousTrack();
+        });
+        
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+            this.playNextTrack();
+        });
+        
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+            if (details.seekTime && this.currentTrackDuration > 0) {
+                this.seekToPosition(details.seekTime);
+            }
+        });
+        
+        navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+            const skipTime = details.seekOffset || 10;
+            const currentTime = this.seekOffset + (this.audio.currentTime || 0);
+            const newTime = Math.max(0, currentTime - skipTime);
+            this.seekToPosition(newTime);
+        });
+        
+        navigator.mediaSession.setActionHandler('seekforward', (details) => {
+            const skipTime = details.seekOffset || 10;
+            const currentTime = this.seekOffset + (this.audio.currentTime || 0);
+            const duration = this.currentTrackDuration || this.audio.duration || 0;
+            const newTime = Math.min(duration, currentTime + skipTime);
+            this.seekToPosition(newTime);
+        });
+    }
+    
+    updateMediaSessionMetadata(title, artist, album, albumId) {
+        if (!('mediaSession' in navigator)) return;
+        
+        const basePath = window.BASE_PATH || '';
+        const artwork = albumId ? [{
+            src: `${basePath}/art/${albumId}`,
+            sizes: '300x300',
+            type: 'image/jpeg'
+        }] : [];
+        
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: title,
+            artist: artist,
+            album: album,
+            artwork: artwork
+        });
+    }
+    
+    updateMediaSessionPlaybackState(state) {
+        if (!('mediaSession' in navigator)) return;
+        
+        navigator.mediaSession.playbackState = state;
+        
+        // Update position state for seeking
+        if (state === 'playing' && this.currentTrackDuration > 0) {
+            const currentTime = this.seekOffset + (this.audio.currentTime || 0);
+            navigator.mediaSession.setPositionState({
+                duration: this.currentTrackDuration,
+                playbackRate: this.audio.playbackRate || 1.0,
+                position: Math.min(currentTime, this.currentTrackDuration)
+            });
+        }
     }
 }
 
