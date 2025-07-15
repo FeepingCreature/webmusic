@@ -78,7 +78,8 @@ body {
     border-left: 3px solid transparent;
 }
 
-.nav-menu a:hover {
+.nav-menu a:hover,
+.nav-menu a.active {
     background: #f8f9fa;
     border-left-color: #3498db;
 }
@@ -87,6 +88,7 @@ body {
     flex: 1;
     padding: 2rem;
     overflow-y: auto;
+    transition: opacity 0.2s ease;
 }
 
 /* Page Headers */
