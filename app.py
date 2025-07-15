@@ -40,12 +40,6 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
         offset = (page - 1) * limit
         
         albums_list = app.db.get_albums(limit=limit, offset=offset)
-        
-        # Check if this is an AJAX request
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            # Return just the content for AJAX requests
-            return render_template('albums.html', albums=albums_list, page=page)
-        
         return render_template('albums.html', albums=albums_list, page=page)
     
     @app.route('/album/<int:album_id>')
@@ -54,11 +48,6 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
         try:
             album = app.db.get_album_by_id(album_id)
             tracks = app.db.get_tracks_by_album(album_id)
-            
-            # Check if this is an AJAX request
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return render_template('album_detail.html', album=album, tracks=tracks)
-            
             return render_template('album_detail.html', album=album, tracks=tracks)
         except AssertionError:
             abort(404)
@@ -81,10 +70,6 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
             for name, albums in sorted(artists_dict.items())
         ]
         
-        # Check if this is an AJAX request
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return render_template('artists.html', artists=artists_list)
-        
         return render_template('artists.html', artists=artists_list)
     
     @app.route('/search')
@@ -96,10 +81,6 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
         if query:
             results['albums'] = app.db.search_albums(query)
             results['tracks'] = app.db.search_tracks(query)
-        
-        # Check if this is an AJAX request
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return render_template('search.html', query=query, results=results)
         
         return render_template('search.html', query=query, results=results)
     
