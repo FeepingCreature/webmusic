@@ -114,7 +114,8 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
         
         assert track, f"Track not found: {track_id}"
         
-        track_path = Path(track['path'])
+        # Convert bytes path back to filesystem path
+        track_path = Path(os.fsdecode(track['path']))
         assert track_path.exists(), f"Track file not found: {track_path}"
         
         # Increment play count
@@ -130,7 +131,8 @@ def create_app(library_path: str, auth_enabled: bool = False) -> Flask:
             album = app.db.get_album_by_id(album_id)
             assert album['art_path'], f"No art path for album: {album_id}"
             
-            art_path = Path(album['art_path'])
+            # Convert bytes path back to filesystem path
+            art_path = Path(os.fsdecode(album['art_path']))
             assert art_path.exists(), f"Art file not found: {art_path}"
             
             return send_file(art_path)

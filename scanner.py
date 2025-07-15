@@ -101,9 +101,12 @@ class MusicScanner:
         """Scan a single album directory."""
         assert album_path.is_dir(), f"Path is not a directory: {album_path}"
         
+        # Convert to bytes for database operations
+        album_path_bytes = os.fsencode(album_path)
+        
         # Check if album needs updating
         last_modified = album_path.stat().st_mtime
-        if not self.db.album_needs_update(str(album_path), last_modified):
+        if not self.db.album_needs_update(album_path_bytes, last_modified):
             return False
         
         # Find audio files
@@ -127,16 +130,17 @@ class MusicScanner:
         
         # Find album art
         art_path = self.find_album_art(album_path)
+        art_path_bytes = os.fsencode(art_path) if art_path else None
         if art_path:
             print(f"  → Found album art: {Path(art_path).name}")
         
         # Add album to database
         album_id = self.db.add_album(
-            path=str(album_path),
+            path=album_path_bytes,
             name=album_name,
             artist=album_artist,
             last_modified=last_modified,
-            art_path=art_path
+            art_path=art_path_bytes
         )
         
         # Add tracks
@@ -144,7 +148,7 @@ class MusicScanner:
             metadata = self.extract_metadata(audio_file)
             self.db.add_track(
                 album_id=album_id,
-                path=str(audio_file),
+                path=os.fsencode(audio_file),
                 title=metadata['title'],
                 artist=metadata['artist'],
                 duration=metadata['duration'],
@@ -164,16 +168,17 @@ class MusicScanner:
         print(f"Starting library scan of: {self.library_path}")
         
         try:
-            for root, dirs, files in os.walk(self.library_path, followlinks=True):
+            # Use os.walk with bytes to handle non-UTF-8 filenames
+            for root, dirs, files in os.walk(os.fsencode(self.library_path), followlinks=True):
                 if self._stop_event.is_set():
                     print("Scan stopped by user request")
                     break
                 
-                root_path = Path(root)
+                root_path = Path(os.fsdecode(root))
                 
                 # Check if this directory contains audio files (leaf directory)
                 has_audio = any(
-                    Path(root, f).suffix.lower() in self.AUDIO_EXTENSIONS 
+                    Path(os.fsdecode(root), os.fsdecode(f)).suffix.lower() in self.AUDIO_EXTENSIONS 
                     for f in files
                 )
                 

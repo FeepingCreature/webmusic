@@ -75,8 +75,8 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
             """)
     
-    def add_album(self, path: str, name: str, artist: str | None = None, 
-                  last_modified: float | None = None, art_path: str | None = None) -> int:
+    def add_album(self, path: bytes, name: str, artist: str | None = None, 
+                  last_modified: float | None = None, art_path: bytes | None = None) -> int:
         """Add or update an album in the database."""
         if last_modified is None:
             last_modified = os.path.getmtime(path)
@@ -92,7 +92,7 @@ class Database:
             assert cursor.lastrowid is not None
             return cursor.lastrowid
     
-    def add_track(self, album_id: int, path: str, title: str, 
+    def add_track(self, album_id: int, path: bytes, title: str, 
                   artist: str | None = None, duration: float | None = None,
                   track_number: int | None = None, cue_start: float | None = None,
                   cue_end: float | None = None) -> int:
@@ -177,7 +177,7 @@ class Database:
                 WHERE track_id = ?
             """, (now, track_id))
     
-    def album_needs_update(self, path: str, last_modified: float) -> bool:
+    def album_needs_update(self, path: bytes, last_modified: float) -> bool:
         """Check if an album needs to be rescanned based on modification time."""
         with self.get_connection() as conn:
             row = conn.execute("""
