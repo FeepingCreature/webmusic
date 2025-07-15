@@ -79,7 +79,7 @@ class Database:
     
     def add_album(self, path: bytes, name: str, artist: str | None = None, 
                   last_modified: float | None = None, art_path: bytes | None = None,
-                  update_timestamp: bool = True) -> int:
+                  update_timestamp: bool = True, clear_tracks: bool = False) -> int:
         """Add or update an album in the database."""
         now = datetime.now().timestamp()
         
@@ -88,6 +88,12 @@ class Database:
             existing = conn.execute("SELECT id, last_modified FROM albums WHERE path = ?", (path,)).fetchone()
             
             if existing:
+                album_id = existing['id']
+                
+                # Clear existing tracks if requested (for rescanning)
+                if clear_tracks:
+                    conn.execute("DELETE FROM tracks WHERE album_id = ?", (album_id,))
+                
                 # Update existing album
                 if update_timestamp and last_modified is None:
                     last_modified = os.path.getmtime(path)
@@ -101,8 +107,8 @@ class Database:
                     UPDATE albums 
                     SET name = ?, artist = ?, last_modified = ?, art_path = ?
                     WHERE id = ?
-                """, (name, artist, last_modified, art_path, existing['id']))
-                return existing['id']
+                """, (name, artist, last_modified, art_path, album_id))
+                return album_id
             else:
                 # Create new album
                 if last_modified is None:

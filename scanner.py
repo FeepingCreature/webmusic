@@ -149,13 +149,14 @@ class MusicScanner:
         art_path = self.find_album_art(album_path)
         art_path_bytes = os.fsencode(art_path) if art_path else None
         
-        # Add album to database (without updating timestamp yet)
+        # Add album to database (without updating timestamp yet, clear existing tracks)
         album_id = self.db.add_album(
             path=album_path_bytes,
             name=album_name,
             artist=album_artist,
             art_path=art_path_bytes,
-            update_timestamp=False
+            update_timestamp=False,
+            clear_tracks=True
         )
         
         # Add tracks
@@ -209,13 +210,14 @@ class MusicScanner:
         if art_path:
             print(f"  → Found album art: {Path(art_path).name}")
         
-        # Add album to database (without updating timestamp yet)
+        # Add album to database (without updating timestamp yet, clear existing tracks)
         album_id = self.db.add_album(
             path=album_path_bytes,
             name=album_name,
             artist=album_artist,
             art_path=art_path_bytes,
-            update_timestamp=False
+            update_timestamp=False,
+            clear_tracks=True
         )
         
         # Add tracks from CUE
