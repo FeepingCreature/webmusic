@@ -78,13 +78,25 @@ class WebMusicPlayer {
             const href = link.getAttribute('href');
             if (!href || href.startsWith('http') || href.startsWith('#')) return;
             
+            const basePath = window.BASE_PATH || '';
+            
+            // Check if this is an internal link (starts with base path or is relative)
+            const isInternalLink = href.startsWith('/') || (basePath && href.startsWith(basePath));
+            if (!isInternalLink) return;
+            
             // Prevent default navigation
             e.preventDefault();
             
-            // Load content via AJAX
-            this.loadPage(href);
+            // Strip base path from href for internal routing
+            let internalHref = href;
+            if (basePath && href.startsWith(basePath)) {
+                internalHref = href.substring(basePath.length) || '/';
+            }
             
-            // Update browser history
+            // Load content via AJAX
+            this.loadPage(internalHref);
+            
+            // Update browser history with full URL
             history.pushState(null, '', href);
         });
         
@@ -176,6 +188,29 @@ class WebMusicPlayer {
     attachContentEventListeners() {
         // Re-attach any event listeners needed for new content
         // This is called after content is dynamically loaded
+        
+        // Re-attach lazy loading for any new images
+        const imageObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    const src = img.dataset.src;
+                    if (src) {
+                        img.src = src;
+                        img.removeAttribute('data-src');
+                        imageObserver.unobserve(img);
+                    }
+                }
+            });
+        }, {
+            rootMargin: '50px'
+        });
+        
+        document.querySelectorAll('.lazy-load').forEach(img => {
+            if (img.dataset.src) {
+                imageObserver.observe(img);
+            }
+        });
         
         // Example: Re-attach play button listeners
         document.querySelectorAll('.play-button').forEach(button => {

@@ -16,8 +16,8 @@
     <div class="album-card">
         <a href="{{ url_for_with_base('album_detail', album_id=album.id) }}">
             {% if album.art_path %}
-            <img src="{{ url_for_with_base('album_art', album_id=album.id) }}" 
-                 alt="{{ album.name }}" class="album-art">
+            <img data-src="{{ url_for_with_base('album_art', album_id=album.id) }}" 
+                 alt="{{ album.name }}" class="album-art lazy-load">
             {% else %}
             <div class="album-art-placeholder">♪</div>
             {% endif %}
@@ -50,11 +50,33 @@ function triggerScan() {
         });
 }
 
-// Album filtering
+// Album filtering and lazy loading
 document.addEventListener('DOMContentLoaded', function() {
     const filterInput = document.getElementById('album-filter');
     const albumsContainer = document.getElementById('albums-container');
     const albumCards = albumsContainer.querySelectorAll('.album-card');
+    
+    // Lazy loading with Intersection Observer
+    const imageObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const src = img.dataset.src;
+                if (src) {
+                    img.src = src;
+                    img.removeAttribute('data-src');
+                    imageObserver.unobserve(img);
+                }
+            }
+        });
+    }, {
+        rootMargin: '50px' // Start loading 50px before image comes into view
+    });
+    
+    // Observe all lazy-load images
+    document.querySelectorAll('.lazy-load').forEach(img => {
+        imageObserver.observe(img);
+    });
     
     filterInput.addEventListener('input', function() {
         const query = this.value.toLowerCase().trim();
