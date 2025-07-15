@@ -158,7 +158,7 @@ def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '
             # Regular audio file
             if profile == 'raw':
                 # Serve file directly for raw profile
-                return send_file(track_path, as_attachment=False)
+                return send_file(track_path, as_attachment=False, download_name='audio')
             else:
                 # Transcode entire file
                 def generate():
@@ -179,7 +179,7 @@ def create_app(library_path: str, auth_enabled: bool = False, base_path: str = '
             art_path = Path(os.fsdecode(album['art_path']))
             assert art_path.exists(), f"Art file not found: {art_path}"
             
-            return send_file(art_path)
+            return send_file(art_path, download_name='cover')
         except AssertionError:
             abort(404)
     
