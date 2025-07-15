@@ -106,25 +106,42 @@ class MusicScanner:
     
     def scan_album(self, album_path: Path) -> bool:
         """Scan a single album directory."""
-        assert album_path.is_dir(), f"Path is not a directory: {album_path}"
-        
-        # Convert to bytes for database operations
-        album_path_bytes = os.fsencode(album_path)
-        
-        # Check if album needs updating
-        last_modified = album_path.stat().st_mtime
-        if not self.db.album_needs_update(album_path_bytes, last_modified):
-            return False
-        
-        # Look for CUE files first
-        cue_files = [f for f in album_path.iterdir() if f.suffix.lower() in self.CUE_EXTENSIONS]
-        
-        if cue_files:
-            # Process CUE/TTA album
-            return self.scan_cue_album(album_path, cue_files[0])
-        else:
-            # Process regular audio files
-            return self.scan_regular_album(album_path)
+        try:
+            print(f"  → Starting scan of: {album_path.relative_to(self.library_path)}")
+            
+            assert album_path.is_dir(), f"Path is not a directory: {album_path}"
+            
+            # Convert to bytes for database operations
+            album_path_bytes = os.fsencode(album_path)
+            
+            # Check if album needs updating
+            last_modified = album_path.stat().st_mtime
+            if not self.db.album_needs_update(album_path_bytes, last_modified):
+                print(f"  → Album up to date: {album_path.relative_to(self.library_path)}")
+                return False
+            
+            print(f"  → Album needs update: {album_path.relative_to(self.library_path)}")
+            
+            # Look for CUE files first
+            cue_files = [f for f in album_path.iterdir() if f.suffix.lower() in self.CUE_EXTENSIONS]
+            
+            if cue_files:
+                print(f"  → Processing CUE album: {cue_files[0].name}")
+                # Process CUE/TTA album
+                result = self.scan_cue_album(album_path, cue_files[0])
+                print(f"  → CUE scan result: {result}")
+                return result
+            else:
+                print(f"  → Processing regular audio album")
+                # Process regular audio files
+                result = self.scan_regular_album(album_path)
+                print(f"  → Regular scan result: {result}")
+                return result
+        except Exception as e:
+            print(f"  → Exception in scan_album for {album_path}: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     def scan_regular_album(self, album_path: Path) -> bool:
         """Scan an album with individual audio files."""
@@ -282,37 +299,51 @@ class MusicScanner:
                     album_dirs.append(root_path)
             
             print(f"Found {len(album_dirs)} album directories")
-            
+        
             # Second pass: scan albums in parallel
+            print(f"Starting parallel scan with ThreadPoolExecutor (4 workers)...")
             with ThreadPoolExecutor(max_workers=4) as executor:
+                print(f"Submitting {len(album_dirs)} scan jobs to executor...")
+            
                 # Submit all scan jobs
                 future_to_path = {
                     executor.submit(self.scan_album, album_path): album_path 
                     for album_path in album_dirs
                 }
-                
+            
+                print(f"All {len(future_to_path)} jobs submitted, waiting for completion...")
+            
                 # Process completed scans
+                completed_count = 0
                 for future in as_completed(future_to_path):
+                    completed_count += 1
+                
                     if self._stop_event.is_set():
                         print("Scan stopped by user request")
                         break
-                    
+                
                     album_path = future_to_path[future]
                     try:
+                        print(f"Processing result for: {album_path.relative_to(self.library_path)}")
                         was_updated = future.result()
                         stats['albums_scanned'] += 1
                         if was_updated:
                             stats['albums_updated'] += 1
-                        
+                    
                         print(f"Scanned album: {album_path.relative_to(self.library_path)} {'(updated)' if was_updated else '(up to date)'}")
-                        
+                    
                         # Progress update every 10 albums
                         if stats['albums_scanned'] % 10 == 0:
                             print(f"Progress: {stats['albums_scanned']}/{len(album_dirs)} albums scanned, {stats['albums_updated']} updated")
-                    
+                
                     except Exception as e:
                         print(f"Error scanning {album_path.relative_to(self.library_path)}: {e}")
+                        print(f"Exception type: {type(e).__name__}")
+                        import traceback
+                        traceback.print_exc()
                         stats['albums_scanned'] += 1
+            
+                print(f"Completed processing {completed_count} futures out of {len(future_to_path)} submitted")
         
         finally:
             self.scanning = False
@@ -324,16 +355,24 @@ class MusicScanner:
         """Run library scan in background thread."""
         def scan_loop() -> None:
             while not self._stop_event.is_set():
-                print("Starting background library scan...")
-                stats = self.scan_library()
-                print(f"Scan complete: {stats}")
+                print(f"Starting background library scan... (interval: {interval}s)")
+                try:
+                    stats = self.scan_library()
+                    print(f"Background scan complete: {stats}")
+                except Exception as e:
+                    print(f"Background scan failed: {e}")
+                    import traceback
+                    traceback.print_exc()
                 
                 # Wait for next scan or stop event
+                print(f"Waiting {interval} seconds until next scan...")
                 if self._stop_event.wait(timeout=interval):
+                    print("Background scanner stopped by stop event")
                     break
         
         thread = threading.Thread(target=scan_loop, daemon=True)
         thread.start()
+        print(f"Background scanner thread started (daemon=True)")
         return thread
     
     def stop_scanning(self) -> None:
