@@ -113,15 +113,22 @@ class MusicScanner:
                 audio_files.append(file)
         
         if not audio_files:
+            print(f"  → No audio files found in {album_path.name}")
             return False
+        
+        print(f"  → Found {len(audio_files)} audio files")
         
         # Extract album metadata from first audio file
         first_file_meta = self.extract_metadata(audio_files[0])
         album_name = first_file_meta.get('album') or album_path.name
         album_artist = first_file_meta.get('artist')
         
+        print(f"  → Album: {album_name} by {album_artist or 'Unknown Artist'}")
+        
         # Find album art
         art_path = self.find_album_art(album_path)
+        if art_path:
+            print(f"  → Found album art: {Path(art_path).name}")
         
         # Add album to database
         album_id = self.db.add_album(
@@ -154,9 +161,12 @@ class MusicScanner:
         self._stop_event.clear()
         stats = {'albums_scanned': 0, 'albums_updated': 0}
         
+        print(f"Starting library scan of: {self.library_path}")
+        
         try:
             for root, dirs, files in os.walk(self.library_path, followlinks=True):
                 if self._stop_event.is_set():
+                    print("Scan stopped by user request")
                     break
                 
                 root_path = Path(root)
@@ -168,12 +178,21 @@ class MusicScanner:
                 )
                 
                 if has_audio:
+                    print(f"Scanning album: {root_path.relative_to(self.library_path)}")
                     if self.scan_album(root_path):
                         stats['albums_updated'] += 1
+                        print(f"  → Updated album metadata")
+                    else:
+                        print(f"  → Album up to date")
                     stats['albums_scanned'] += 1
+                    
+                    # Progress update every 10 albums
+                    if stats['albums_scanned'] % 10 == 0:
+                        print(f"Progress: {stats['albums_scanned']} albums scanned, {stats['albums_updated']} updated")
         
         finally:
             self.scanning = False
+            print(f"Library scan complete: {stats['albums_scanned']} albums scanned, {stats['albums_updated']} updated")
         
         return stats
     
