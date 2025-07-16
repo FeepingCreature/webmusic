@@ -105,12 +105,19 @@ class MusicScanner:
                 value = audio_file[tag_name]
                 print(f"    Found tag {tag_name}: {repr(value)}")
                 
+                # Handle mutagen tag objects (ID3v2 tags have .text attribute)
+                if hasattr(value, 'text'):
+                    value = value.text
+                    print(f"    Extracted .text: {repr(value)}")
+                
                 if isinstance(value, list) and value:
                     value = value[0]
+                    print(f"    Used first list item: {repr(value)}")
                 
                 # Handle "track/total" format
                 if isinstance(value, str) and '/' in value:
                     value = value.split('/')[0]
+                    print(f"    Split track/total: {repr(value)}")
                 
                 try:
                     track_num = int(str(value))
