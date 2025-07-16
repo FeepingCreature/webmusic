@@ -243,6 +243,8 @@ def main() -> None:
                        help='Background scan interval in seconds')
     parser.add_argument('--base-path', default='', 
                        help='Base path for reverse proxy (e.g., /webmusic)')
+    parser.add_argument('--rescan-all', action='store_true',
+                       help='Rescan all albums and exit (ignores modification times)')
     
     args = parser.parse_args()
     
@@ -251,6 +253,13 @@ def main() -> None:
     # Create Flask app
     auth_enabled = args.auth in ['required', 'optional']
     app = create_app(args.library, auth_enabled, args.base_path)
+    
+    # Handle rescan-all flag
+    if args.rescan_all:
+        print(f"Starting full library rescan of: {args.library}")
+        stats = app.scanner.scan_library()
+        print(f"Rescan complete: {stats['albums_scanned']} albums scanned, {stats['albums_updated']} updated")
+        return
     
     # Start background scanner
     if args.scan_interval > 0:
