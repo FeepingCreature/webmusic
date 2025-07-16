@@ -87,9 +87,6 @@ class MusicScanner:
     
     def _get_track_number(self, audio_file: mutagen.FileType) -> int | None:
         """Extract track number from various tag formats."""
-        # Debug: print all available tags
-        print(f"    Available tags: {list(audio_file.keys())}")
-        
         # Comprehensive list of track number tag names across formats
         track_tags = [
             'TRCK',        # ID3v2 (MP3)
@@ -103,31 +100,24 @@ class MusicScanner:
         for tag_name in track_tags:
             if tag_name in audio_file:
                 value = audio_file[tag_name]
-                print(f"    Found tag {tag_name}: {repr(value)}")
                 
                 # Handle mutagen tag objects (ID3v2 tags have .text attribute)
                 if hasattr(value, 'text'):
                     value = value.text
-                    print(f"    Extracted .text: {repr(value)}")
                 
                 if isinstance(value, list) and value:
                     value = value[0]
-                    print(f"    Used first list item: {repr(value)}")
                 
                 # Handle "track/total" format
                 if isinstance(value, str) and '/' in value:
                     value = value.split('/')[0]
-                    print(f"    Split track/total: {repr(value)}")
                 
                 try:
                     track_num = int(str(value))
-                    print(f"    Extracted track number: {track_num}")
                     return track_num
                 except (ValueError, TypeError):
-                    print(f"    Failed to convert {repr(value)} to int")
                     continue
         
-        print(f"    No track number found")
         return None
     
     def scan_album(self, album_path: Path, force_rescan: bool = False) -> bool:
