@@ -87,10 +87,24 @@ class MusicScanner:
     
     def _get_track_number(self, audio_file: mutagen.FileType) -> int | None:
         """Extract track number from various tag formats."""
-        track_tags = ['TRCK', 'TRACKNUMBER', 'trkn']
+        # Debug: print all available tags
+        print(f"    Available tags: {list(audio_file.keys())}")
+        
+        # Comprehensive list of track number tag names across formats
+        track_tags = [
+            'TRCK',        # ID3v2 (MP3)
+            'TRACKNUMBER', # Vorbis Comment (OGG, FLAC)
+            'TRACK',       # Alternative Vorbis Comment
+            'trkn',        # MP4/M4A
+            'TPE1',        # Sometimes misused
+            'TN',          # ID3v1
+        ]
+        
         for tag_name in track_tags:
             if tag_name in audio_file:
                 value = audio_file[tag_name]
+                print(f"    Found tag {tag_name}: {repr(value)}")
+                
                 if isinstance(value, list) and value:
                     value = value[0]
                 
@@ -99,10 +113,14 @@ class MusicScanner:
                     value = value.split('/')[0]
                 
                 try:
-                    return int(str(value))
+                    track_num = int(str(value))
+                    print(f"    Extracted track number: {track_num}")
+                    return track_num
                 except (ValueError, TypeError):
+                    print(f"    Failed to convert {repr(value)} to int")
                     continue
         
+        print(f"    No track number found")
         return None
     
     def scan_album(self, album_path: Path) -> bool:
@@ -188,6 +206,7 @@ class MusicScanner:
         # Add tracks
         for audio_file in audio_files:
             metadata = self.extract_metadata(audio_file)
+            print(f"  → Adding track: {metadata['title']}, track_number: {metadata['track_number']}")
             self.db.add_track(
                 album_id=album_id,
                 path=os.fsencode(audio_file),
@@ -255,6 +274,7 @@ class MusicScanner:
             
             end_time_str = f"{track.end_time:.2f}s" if track.end_time else "end"
             print(f"  → Adding track {track.number}: {track.title} ({track.start_time:.2f}s - {end_time_str})")
+            print(f"  → Track number from CUE: {track.number}")
             
             track_id = self.db.add_track(
                 album_id=album_id,
