@@ -128,9 +128,13 @@ class MusicScanner:
         try:
             # Use repr() to safely handle non-UTF-8 paths
             rel_path = repr(str(album_path.relative_to(self.library_path)))
-            print(f"  → Starting scan of: {rel_path}")
+            print(f"  → Starting scan of: {rel_path} (force_rescan={force_rescan})")
             
             assert album_path.is_dir(), f"Path is not a directory: {album_path}"
+            
+            # List files in directory for debugging
+            files_in_dir = list(album_path.iterdir())
+            print(f"  → Found {len(files_in_dir)} files/dirs: {[f.name for f in files_in_dir[:5]]}{'...' if len(files_in_dir) > 5 else ''}")
             
             # Convert to bytes for database operations
             album_path_bytes = os.fsencode(album_path)
@@ -143,7 +147,10 @@ class MusicScanner:
                 return False
             
             rel_path = repr(str(album_path.relative_to(self.library_path)))
-            print(f"  → Album needs update: {rel_path}")
+            if force_rescan:
+                print(f"  → Force rescanning: {rel_path}")
+            else:
+                print(f"  → Album needs update: {rel_path}")
             
             # Look for CUE files first
             cue_files = [f for f in album_path.iterdir() if f.suffix.lower() in self.CUE_EXTENSIONS]
