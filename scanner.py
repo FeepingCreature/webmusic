@@ -123,7 +123,7 @@ class MusicScanner:
         print(f"    No track number found")
         return None
     
-    def scan_album(self, album_path: Path) -> bool:
+    def scan_album(self, album_path: Path, force_rescan: bool = False) -> bool:
         """Scan a single album directory."""
         try:
             # Use repr() to safely handle non-UTF-8 paths
@@ -135,9 +135,9 @@ class MusicScanner:
             # Convert to bytes for database operations
             album_path_bytes = os.fsencode(album_path)
             
-            # Check if album needs updating
+            # Check if album needs updating (unless force_rescan is True)
             last_modified = album_path.stat().st_mtime
-            if not self.db.album_needs_update(album_path_bytes, last_modified):
+            if not force_rescan and not self.db.album_needs_update(album_path_bytes, last_modified):
                 rel_path = repr(str(album_path.relative_to(self.library_path)))
                 print(f"  → Album up to date: {rel_path}")
                 return False
@@ -295,7 +295,7 @@ class MusicScanner:
         print(f"  → Successfully added {len(cue_sheet.tracks)} tracks")
         return True
     
-    def scan_library(self) -> Dict[str, int]:
+    def scan_library(self, force_rescan: bool = False) -> Dict[str, int]:
         """Scan the entire music library."""
         assert not self.scanning, "Scan already in progress"
         
@@ -303,7 +303,8 @@ class MusicScanner:
         self._stop_event.clear()
         stats = {'albums_scanned': 0, 'albums_updated': 0}
         
-        print(f"Starting library scan of: {self.library_path}")
+        scan_type = "forced full rescan" if force_rescan else "library scan"
+        print(f"Starting {scan_type} of: {self.library_path}")
         
         try:
             # First pass: collect all album directories
