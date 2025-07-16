@@ -352,7 +352,7 @@ class MusicScanner:
             
                 # Submit all scan jobs
                 future_to_path = {
-                    executor.submit(self.scan_album, album_path): album_path 
+                    executor.submit(self.scan_album, album_path, force_rescan): album_path 
                     for album_path in album_dirs
                 }
             
