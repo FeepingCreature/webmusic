@@ -257,7 +257,7 @@ def main() -> None:
     # Handle rescan-all flag
     if args.rescan_all:
         print(f"Starting full library rescan of: {args.library}")
-        stats = app.scanner.scan_library()
+        stats = app.scanner.scan_library(force_rescan=True)
         print(f"Rescan complete: {stats['albums_scanned']} albums scanned, {stats['albums_updated']} updated")
         return
     
